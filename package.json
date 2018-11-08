@@ -1,0 +1,41 @@
+{
+  "name": "hapi-sentry",
+  "version": "0.0.0",
+  "description": "hapi plugin for @sentry/node",
+  "main": "index.js",
+  "scripts": {
+    "test": "echo \"Error: no test specified\" && exit 1",
+    "precommit": "lint-staged",
+    "lint": "eslint --ignore-path .gitignore .",
+    "lint-fix": "eslint --fix --ignore-path .gitignore ."
+  },
+  "lint-staged": {
+    "*.js": "eslint"
+  },
+  "eslintConfig": {
+    "extends": "@hydrant/eslint-config/modern"
+  },
+  "repository": {
+    "type": "git",
+    "url": "git@github.com/hydra-newmedia/hapi-sentry.git"
+  },
+  "keywords": [
+    "hapi",
+    "sentry",
+    "plugin"
+  ],
+  "author": "Christian Hotz <hotz@hydra-newmedia.com>",
+  "license": "MIT",
+  "peerDependencies": {
+    "hapi": "> 17"
+  },
+  "dependencies": {
+    "@sentry/node": "^4.2.4",
+    "joi": "^14.0.4"
+  },
+  "devDependencies": {
+    "@hydrant/eslint-config": "^2.0.1",
+    "eslint": "^5.8.0",
+    "lint-staged": "^8.0.4"
+  }
+}
