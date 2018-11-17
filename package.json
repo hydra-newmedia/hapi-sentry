@@ -15,10 +15,7 @@
   "eslintConfig": {
     "extends": "@hydrant/eslint-config/modern"
   },
-  "repository": {
-    "type": "git",
-    "url": "git@github.com/hydra-newmedia/hapi-sentry.git"
-  },
+  "repository": "hydra-newmedia/hapi-sentry",
   "keywords": [
     "hapi",
     "sentry",
