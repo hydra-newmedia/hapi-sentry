@@ -4,7 +4,7 @@
   "description": "hapi plugin for @sentry/node",
   "main": "index.js",
   "scripts": {
-    "test": "echo \"Error: no test specified\" && exit 1",
+    "test": "ava test.js --serial",
     "precommit": "lint-staged",
     "lint": "eslint --ignore-path .gitignore .",
     "lint-fix": "eslint --fix --ignore-path .gitignore ."
@@ -35,7 +35,10 @@
   },
   "devDependencies": {
     "@hydrant/eslint-config": "^2.0.1",
+    "ava": "^1.0.0-rc.2",
     "eslint": "^5.8.0",
-    "lint-staged": "^8.0.4"
+    "hapi": "^17.7.0",
+    "lint-staged": "^8.0.4",
+    "p-defer": "^1.0.0"
   }
 }
