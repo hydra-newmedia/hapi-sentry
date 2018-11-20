@@ -19,6 +19,7 @@ The plugin options, you can pass in while registering are the following:
 |:--------------------------|:-------------|:-----------------------------------------------------------------------------------------------------------------------------|
 | `baseUri`                 | string       | [uri](https://github.com/hapijs/joi/blob/master/API.md#stringurioptions) to be used as base for captured urls                |
 | `channels`                | \[string\]   | One or array of hapi [server.events](https://hapijs.com/api#-servereventevents) channels to be captured. Default: `'error'`  |
+| `trackUser`               | boolean      | Whether or not to track the user via the per-request scope. Default: `true`                                                  |
 | `scope.tags`              | object       | An array of tags to be sent with every event                                                                                 |
 | `scope.tags.name`         | string       | The name of a tag                                                                                                            |
 | `scope.tags.value`        | any          | The value of a tag                                                                                                           |

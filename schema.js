@@ -9,6 +9,7 @@ const levels = Object.values(Severity).filter(level => typeof level === 'string'
 module.exports = joi.object().keys({
   baseUri: joi.string().uri(),
   channels: joi.array().items(joi.string().only(levels)).single().default('error'),
+  trackUser: joi.boolean().default(true),
   scope: joi.object().keys({
     tags: joi.array().items(joi.object().keys({
       name: joi.string().required(),
