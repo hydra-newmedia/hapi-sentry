@@ -13,7 +13,10 @@
     "*.js": "eslint"
   },
   "eslintConfig": {
-    "extends": "@hydrant/eslint-config/modern"
+    "extends": [
+      "@hydrant/eslint-config/modern",
+      "plugin:ava/recommended"
+    ]
   },
   "repository": "github:hydra-newmedia/hapi-sentry",
   "keywords": [
@@ -34,6 +37,7 @@
     "@hydrant/eslint-config": "^2.0.1",
     "ava": "^1.0.0-rc.2",
     "eslint": "^5.8.0",
+    "eslint-plugin-ava": "^5.1.1",
     "hapi": "^17.7.0",
     "lint-staged": "^8.0.4",
     "p-defer": "^1.0.0"
