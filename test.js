@@ -48,7 +48,7 @@ test('exposes a per-request scope', async t => {
   server.route({
     method: 'GET',
     path: '/',
-    handler: (request) => {
+    handler (request) {
       t.is(typeof request.sentryScope.setTag, 'function');
       return null;
     },
@@ -73,7 +73,7 @@ test('captures request errors', async t => {
   server.route({
     method: 'GET',
     path: '/',
-    handler: () => {
+    handler() {
       throw new Error('Oh no!');
     },
   });
@@ -105,7 +105,7 @@ test('parses request metadata', async t => {
   server.route({
     method: 'GET',
     path: '/route',
-    handler: () => {
+    handler() {
       throw new Error('Oh no!');
     },
   });
@@ -137,7 +137,7 @@ test('sanitizes user info from auth', async t => {
 
   server.auth.scheme('mock', () => {
     return {
-      authenticate: (request, h) => {
+      authenticate(request, h) {
         return h.authenticated({
           credentials: {
             username: 'me',
@@ -154,7 +154,7 @@ test('sanitizes user info from auth', async t => {
   server.route({
     method: 'GET',
     path: '/',
-    handler: () => {
+    handler() {
       throw new Error('Oh no!');
     },
     config: {
