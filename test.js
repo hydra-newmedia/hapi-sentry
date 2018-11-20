@@ -14,14 +14,12 @@ const dsn = 'https://53039209a22b4ec1bcc296a3c9fdecd6@sentry.io/4291';
 
 test('requires a dsn', async t => {
   const { server } = t.context;
-  const err = await t.throwsAsync(async () => {
-    await server.register({
-      plugin,
-      options: {
-        client: {},
-      },
-    });
-  }, {
+  const err = await t.throwsAsync(() => server.register({
+    plugin,
+    options: {
+      client: {},
+    },
+  }), {
     name: 'ValidationError',
     message: /Invalid hapi-sentry options/,
   });
@@ -37,7 +35,7 @@ test('exposes the sentry client', async t => {
   await server.register({
     plugin,
     options: {
-      client: { dsn, beforeSend: (e) => e },
+      client: { dsn, beforeSend: e => e },
     },
   });
 
@@ -50,7 +48,7 @@ test('exposes a per-request scope', async t => {
   server.route({
     method: 'GET',
     path: '/',
-    handler: async (request) => {
+    handler: (request) => {
       t.is(typeof request.sentryScope.setTag, 'function');
       return null;
     },
@@ -75,7 +73,7 @@ test('captures request errors', async t => {
   server.route({
     method: 'GET',
     path: '/',
-    handler: async () => {
+    handler: () => {
       throw new Error('Oh no!');
     },
   });
@@ -107,7 +105,7 @@ test('parses request metadata', async t => {
   server.route({
     method: 'GET',
     path: '/route',
-    handler: async () => {
+    handler: () => {
       throw new Error('Oh no!');
     },
   });
@@ -128,8 +126,7 @@ test('parses request metadata', async t => {
     url: '/route',
   });
 
-  const event = await deferred.promise;
-  const { request } = event;
+  const { request } = await deferred.promise;
   t.is(request.method, 'GET');
   t.is(typeof request.headers, 'object');
   t.is(request.url, `http://${request.headers.host}/route`);
@@ -157,7 +154,7 @@ test('sanitizes user info from auth', async t => {
   server.route({
     method: 'GET',
     path: '/',
-    handler: async () => {
+    handler: () => {
       throw new Error('Oh no!');
     },
     config: {
