@@ -48,7 +48,7 @@ test('exposes a per-request scope', async t => {
   server.route({
     method: 'GET',
     path: '/',
-    handler (request) {
+    handler(request) {
       t.is(typeof request.sentryScope.setTag, 'function');
       return null;
     },
