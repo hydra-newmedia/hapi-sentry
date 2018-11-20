@@ -51,7 +51,7 @@ exports.register = (server, options) => {
     sentryEvent.level = event.channel;
 
     // use request credentials for capturing user
-    sentryEvent.user = request.auth && request.auth.credentials;
+    if (opts.trackUser) sentryEvent.user = request.auth && request.auth.credentials;
     if (sentryEvent.user) {
       Object.keys(sentryEvent.user) // hide credentials
         .filter(prop => /^(p(ass)?w(or)?(d|t)?|secret)?$/i.test(prop))
