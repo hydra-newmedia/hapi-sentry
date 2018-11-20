@@ -5,12 +5,12 @@ const hapi = require('hapi');
 const defer = require('p-defer');
 const plugin = require('./');
 
+const dsn = 'https://user@sentry.io/project';
+
 test.beforeEach(t => {
   delete global.__SENTRY__;
   t.context.server = new hapi.Server();
 });
-
-const dsn = 'https://53039209a22b4ec1bcc296a3c9fdecd6@sentry.io/4291';
 
 test('requires a dsn', async t => {
   const { server } = t.context;
