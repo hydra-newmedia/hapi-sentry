@@ -35,7 +35,7 @@ test('exposes the sentry client', async t => {
   await server.register({
     plugin,
     options: {
-      client: { dsn, beforeSend: e => e },
+      client: { dsn },
     },
   });
 
