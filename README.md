@@ -1,5 +1,10 @@
 # hapi-sentry
 
+[![package on npm](https://img.shields.io/npm/v/hapi-sentry.svg)](https://www.npmjs.com/package/hapi-sentry)
+[![Travis branch](https://travis-ci.com/hydra-newmedia/hapi-sentry.svg?branch=master)](https://travis-ci.com/hydra-newmedia/hapi-sentry)
+![node 8+ required](https://img.shields.io/badge/node-8%2B-brightgreen.svg)
+[![GitHub license](https://img.shields.io/badge/license-MIT-blue.svg)](https://raw.githubusercontent.com/hydra-newmedia/hapi-sentry/master/LICENSE)
+
 A hapi [plugin](https://hapijs.com/api#plugins) for
 request error logging to [Sentry](https://sentry.io/).
 
