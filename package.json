@@ -27,7 +27,7 @@
   "author": "Christian Hotz <hotz@hydra-newmedia.com>",
   "license": "MIT",
   "peerDependencies": {
-    "hapi": "> 17"
+    "hapi": ">=17"
   },
   "dependencies": {
     "@sentry/node": "^4.2.4",
