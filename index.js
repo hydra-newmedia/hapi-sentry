@@ -4,8 +4,6 @@ const { name, version } = require('./package.json');
 const schema = require('./schema');
 
 const Sentry = require('@sentry/node');
-const { parseError } = require('@sentry/node/dist/parsers');
-const { parseRequest } = require('@sentry/node/dist/handlers');
 const joi = require('joi');
 
 exports.register = (server, options) => {
@@ -38,8 +36,8 @@ exports.register = (server, options) => {
   // catch request errors/warnings/etc (default: only errors) and capture them with sentry
   server.events.on({ name: 'request', channels: opts.channels }, async (request, event) => {
     // format a sentry event from the request and triggered event
-    const sentryEvent = await parseError(event.error);
-    parseRequest(sentryEvent, request.raw.req);
+    const sentryEvent = await Sentry.Parsers.parseError(event.error);
+    Sentry.Handlers.parseRequest(sentryEvent, request.raw.req);
 
     // overwrite events request url if a baseUrl is provided
     if (opts.baseUri) {
