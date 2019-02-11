@@ -3,6 +3,7 @@
 const { name, version } = require('./package.json');
 const schema = require('./schema');
 
+const Hoek = require('hoek');
 const Sentry = require('@sentry/node');
 const joi = require('joi');
 
@@ -61,7 +62,7 @@ exports.register = (server, options) => {
 
     // @sentry/node.captureEvent does not support scope parameter, if it's not from Sentry.Hub(?)
     Sentry.withScope(scope => { // thus use a temp scope and re-assign it
-      Object.assign(scope, request.sentryScope);
+      Hoek.applyToDefaults(scope, request.sentryScope);
       Sentry.captureEvent(sentryEvent);
     });
   });
