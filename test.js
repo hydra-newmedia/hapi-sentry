@@ -12,7 +12,7 @@ test.beforeEach(t => {
   t.context.server = new hapi.Server();
 });
 
-test('requires a dsn', async t => {
+test('requires a dsn or a Scope (sentry opts vs. sentry client)', async t => {
   const { server } = t.context;
   const err = await t.throwsAsync(() => server.register({
     plugin,
@@ -26,7 +26,51 @@ test('requires a dsn', async t => {
 
   t.deepEqual(err.details.map(d => d.message), [
     '"dsn" is required',
+    '"Scope" is required',
   ]);
+});
+
+test('uses a custom sentry client', async t => {
+  const { server } = t.context;
+
+  server.route({
+    method: 'GET',
+    path: '/route',
+    handler() {
+      throw new Error('This will be overwritten by custom sentry client');
+    },
+  });
+
+  const deferred = defer();
+  const parsedError = { request: {}, test: 'testEvent' };
+  const customSentry = {
+    Scope: class Scope {},
+    /* eslint-disable no-unused-vars */ // arity needed to pass joi validation
+    Parsers: { parseError: x => parsedError },
+    Handlers: { parseRequest: (x, y) => {} },
+    withScope: cb => cb({}),
+    /* eslint-enable no-unused-var */
+    captureEvent: deferred.resolve,
+  };
+
+  // check exposing of custom client
+  await server.register({
+    plugin,
+    options: {
+      client: customSentry,
+    },
+  });
+
+  t.deepEqual(server.plugins['hapi-sentry'].client, customSentry);
+
+  // check if custom sentry is used per request
+  await server.inject({
+    method: 'GET',
+    url: '/route',
+  });
+
+  const event = await deferred.promise;
+  t.is(event, parsedError);
 });
 
 test('exposes the sentry client', async t => {
