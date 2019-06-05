@@ -13,7 +13,7 @@ const sentryClient = joi.object().keys({
     parseRequest: joi.func().minArity(2).required(),
   }).unknown().required(),
   withScope: joi.func().minArity(1).required(),
-  captureEvent: joi.func().minArity(1).required(),
+  captureException: joi.func().minArity(1).required(),
 }).unknown();
 
 const sentryOptions = joi.object().keys({

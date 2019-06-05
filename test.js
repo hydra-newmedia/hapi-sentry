@@ -20,9 +20,9 @@ test('requires a dsn or a Scope (sentry opts vs. sentry client)', async t => {
       client: {},
     },
   }), {
-    name: 'ValidationError',
-    message: /Invalid hapi-sentry options/,
-  });
+      name: 'ValidationError',
+      message: /Invalid hapi-sentry options/,
+    });
 
   t.deepEqual(err.details.map(d => d.message), [
     '"dsn" is required',
@@ -33,24 +33,24 @@ test('requires a dsn or a Scope (sentry opts vs. sentry client)', async t => {
 test('uses a custom sentry client', async t => {
   const { server } = t.context;
 
+  const error = new Error('Error to be thrown');
+
   server.route({
     method: 'GET',
     path: '/route',
     handler() {
-      throw new Error('This will be overwritten by custom sentry client');
+      throw error;
     },
   });
 
   const deferred = defer();
-  const parsedError = { request: {}, test: 'testEvent' };
   const customSentry = {
     Scope: class Scope {},
     /* eslint-disable no-unused-vars */ // arity needed to pass joi validation
-    Parsers: { parseError: x => parsedError },
-    Handlers: { parseRequest: (x, y) => {} },
-    withScope: cb => cb({}),
+    Handlers: { parseRequest: (x, y) => { } },
+    withScope: cb => cb({ addEventProcessor: () => { } }),
     /* eslint-enable no-unused-var */
-    captureEvent: deferred.resolve,
+    captureException: deferred.resolve,
   };
 
   // check exposing of custom client
@@ -70,7 +70,7 @@ test('uses a custom sentry client', async t => {
   });
 
   const event = await deferred.promise;
-  t.is(event, parsedError);
+  t.is(event, error);
 });
 
 test('exposes the sentry client', async t => {
