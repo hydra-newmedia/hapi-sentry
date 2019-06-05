@@ -40,34 +40,35 @@ exports.register = (server, options) => {
 
   // catch request errors/warnings/etc (default: only errors) and capture them with sentry
   server.events.on({ name: 'request', channels: opts.channels }, async (request, event) => {
-    // format a sentry event from the request and triggered event
-    const sentryEvent = await Sentry.Parsers.parseError(event.error);
-    Sentry.Handlers.parseRequest(sentryEvent, request.raw.req);
-
-    // overwrite events request url if a baseUrl is provided
-    if (opts.baseUri) {
-      if (opts.baseUri.slice(-1) === '/') opts.baseUri = opts.baseUri.slice(0, -1);
-      sentryEvent.request.url = opts.baseUri + request.path;
-    }
-
-    // set severity according to the filters channel
-    sentryEvent.level = event.channel;
-
-    // use request credentials for capturing user
-    if (opts.trackUser) sentryEvent.user = request.auth && request.auth.credentials;
-    if (sentryEvent.user) {
-      Object.keys(sentryEvent.user) // hide credentials
-        .filter(prop => /^(p(ass)?w(or)?(d|t)?|secret)?$/i.test(prop))
-        .forEach(prop => delete sentryEvent.user[prop]);
-    }
-
-    // some SDK identificator
-    sentryEvent.sdk = { name: 'sentry.javascript.node.hapi', version };
-
-    // @sentry/node.captureEvent does not support scope parameter, if it's not from Sentry.Hub(?)
     Sentry.withScope(scope => { // thus use a temp scope and re-assign it
+      scope.addEventProcessor(_sentryEvent => {
+        // format a sentry event from the request and triggered event
+        const sentryEvent = Sentry.Handlers.parseRequest(_sentryEvent, request.raw.req);
+
+        // overwrite events request url if a baseUrl is provided
+        if (opts.baseUri) {
+          if (opts.baseUri.slice(-1) === '/') opts.baseUri = opts.baseUri.slice(0, -1);
+          sentryEvent.request.url = opts.baseUri + request.path;
+        }
+
+        // set severity according to the filters channel
+        sentryEvent.level = event.channel;
+
+        // use request credentials for capturing user
+        if (opts.trackUser) sentryEvent.user = request.auth && request.auth.credentials;
+        if (sentryEvent.user) {
+          Object.keys(sentryEvent.user) // hide credentials
+            .filter(prop => /^(p(ass)?w(or)?(d|t)?|secret)?$/i.test(prop))
+            .forEach(prop => delete sentryEvent.user[prop]);
+        }
+
+        // some SDK identificator
+        sentryEvent.sdk = { name: 'sentry.javascript.node.hapi', version };
+        return sentryEvent;
+      });
+
       Hoek.applyToDefaults(scope, request.sentryScope);
-      Sentry.captureEvent(sentryEvent);
+      Sentry.captureException(event.error);
     });
   });
 

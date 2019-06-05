@@ -9,9 +9,6 @@ const levels = Object.values(Severity).filter(level => typeof level === 'string'
 const sentryClient = joi.object().keys({
   configureScope: joi.func().minArity(1),
   Scope: joi.func().required(),
-  Parsers: joi.object().keys({
-    parseError: joi.func().minArity(1).required(),
-  }).unknown().required(),
   Handlers: joi.object().keys({
     parseRequest: joi.func().minArity(2).required(),
   }).unknown().required(),
