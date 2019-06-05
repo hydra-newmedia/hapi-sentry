@@ -4,14 +4,18 @@ const { name, version } = require('./package.json');
 const schema = require('./schema');
 
 const Hoek = require('hoek');
-const Sentry = require('@sentry/node');
 const joi = require('joi');
 
 exports.register = (server, options) => {
   const opts = joi.attempt(options, schema, 'Invalid hapi-sentry options:');
 
-  // initialize sentry client
-  Sentry.init(opts.client);
+  let Sentry = opts.client;
+  // initialize own sentry client if none passed as option
+  if (opts.client.dsn) {
+    Sentry = require('@sentry/node');
+    Sentry.init(opts.client);
+  }
+
   // initialize global scope if set via plugin options
   if (opts.scope) {
     Sentry.configureScope(scope => {
