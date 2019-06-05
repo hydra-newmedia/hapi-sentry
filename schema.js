@@ -21,17 +21,7 @@ const sentryClient = joi.object().keys({
 
 const sentryOptions = joi.object().keys({
   dsn: joi.string().uri().allow(false).required(),
-  debug: joi.boolean(),
-  release: joi.string(),
-  environment: joi.string(),
-  sampleRate: joi.number().min(0).max(1),
-  maxBreadcrumbs: joi.number().integer(),
-  attachStacktrace: joi.any(),
-  sendDefaultPii: joi.boolean(),
-  serverName: joi.string(),
-  beforeSend: joi.func(),
-  beforeBreadcrumb: joi.func(),
-});
+}).unknown();
 
 module.exports = joi.object().keys({
   baseUri: joi.string().uri(),
