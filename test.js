@@ -20,9 +20,9 @@ test('requires a dsn or a Scope (sentry opts vs. sentry client)', async t => {
       client: {},
     },
   }), {
-      name: 'ValidationError',
-      message: /Invalid hapi-sentry options/,
-    });
+    name: 'ValidationError',
+    message: /Invalid hapi-sentry options/,
+  });
 
   t.deepEqual(err.details.map(d => d.message), [
     '"dsn" is required',
