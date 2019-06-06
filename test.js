@@ -120,31 +120,6 @@ test('exposes the sentry client', async t => {
   t.is(typeof server.plugins['hapi-sentry'].client.captureException, 'function');
 });
 
-test('exposes a per-request scope', async t => {
-  const { server } = t.context;
-
-  server.route({
-    method: 'GET',
-    path: '/',
-    handler(request) {
-      t.is(typeof request.sentryScope.setTag, 'function');
-      return null;
-    },
-  });
-
-  await server.register({
-    plugin,
-    options: {
-      client: { dsn },
-    },
-  });
-
-  await server.inject({
-    method: 'GET',
-    url: '/',
-  });
-});
-
 test('captures request errors', async t => {
   const { server } = t.context;
 

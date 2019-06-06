@@ -3,8 +3,8 @@
 const { name, version } = require('./package.json');
 const schema = require('./schema');
 
-const Hoek = require('@hapi/hoek');
 const joi = require('@hapi/joi');
+const domain = require('domain');
 
 exports.register = (server, options) => {
   const opts = joi.attempt(options, schema, 'Invalid hapi-sentry options:');
@@ -29,11 +29,15 @@ exports.register = (server, options) => {
   // expose sentry client at server.plugins['hapi-sentry'].client
   server.expose('client', Sentry);
 
-  // attach a new scope to each request for breadcrumbs/tags/extras/etc capturing
   server.ext({
     type: 'onRequest',
     method(request, h) {
-      request.sentryScope = new Sentry.Scope();
+      // Sentry looks for current hub in active domain
+      // Therefore simply by creating&entering domain Sentry will create
+      // request scoped hub for breadcrumps and other scope metadata
+
+      request.__sentryDomain = domain.create();
+      request.__sentryDomain.enter();
       return h.continue;
     },
   });
@@ -81,9 +85,16 @@ exports.register = (server, options) => {
         return sentryEvent;
       });
 
-      Hoek.merge(scope, request.sentryScope);
       Sentry.captureException(event.error);
     });
+  });
+
+  server.events.on('response', request => {
+    if (request.__sentryDomain) {
+      // exiting domain, not sure if thats necessary, hard to find definitive answer,
+      // but its safer to prevent potentional memory leaks
+      request.__sentryDomain.exit();
+    }
   });
 
   if (opts.catchLogErrors) {
