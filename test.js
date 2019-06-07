@@ -30,6 +30,41 @@ test('requires a dsn or a Scope (sentry opts vs. sentry client)', async t => {
   ]);
 });
 
+test('allows deactivating capture (opts.dsn to be false)', async t => {
+  const { server } = t.context;
+
+  server.route({
+    method: 'GET',
+    path: '/',
+    handler() {
+      throw new Error('Oh no!');
+    },
+  });
+
+  const deferred = defer();
+  await t.notThrowsAsync(() => server.register({
+    plugin,
+    options: {
+      client: {
+        dsn: false,
+        beforeSend: deferred.resolve,
+      },
+    },
+  }));
+
+  await server.inject({
+    method: 'GET',
+    url: '/',
+  });
+
+  let eventCaptured = false;
+  deferred.promise.then(() => eventCaptured = true);
+
+  // wait for sentry event possibly to be sent
+  await new Promise(resolve => setTimeout(resolve, 20));
+  t.is(eventCaptured, false);
+});
+
 test('uses a custom sentry client', async t => {
   const { server } = t.context;
 

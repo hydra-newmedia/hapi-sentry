@@ -11,7 +11,7 @@ exports.register = (server, options) => {
 
   let Sentry = opts.client;
   // initialize own sentry client if none passed as option
-  if (opts.client.dsn) {
+  if (opts.client.dsn !== undefined) {
     Sentry = require('@sentry/node');
     Sentry.init(opts.client);
   }
