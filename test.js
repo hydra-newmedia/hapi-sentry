@@ -1,7 +1,7 @@
 'use strict';
 
 const test = require('ava');
-const hapi = require('hapi');
+const hapi = require('@hapi/hapi');
 const defer = require('p-defer');
 const plugin = require('./');
 
@@ -174,8 +174,8 @@ test('captures request errors', async t => {
   });
 
   const event = await deferred.promise;
-  t.is(event.message, 'Error: Oh no!');
-  t.is(event.level, 'error');
+  t.is(event.exception.values[0].value, 'Oh no!');
+  t.is(event.exception.values[0].type, 'Error');
 });
 
 test('parses request metadata', async t => {
