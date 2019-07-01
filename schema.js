@@ -1,7 +1,7 @@
 'use strict';
 
 const { Severity } = require('@sentry/node');
-const joi = require('joi');
+const joi = require('@hapi/joi');
 
 const levels = Object.values(Severity).filter(level => typeof level === 'string')
   || ['fatal', 'error', 'warning', 'log', 'info', 'debug', 'critical'];

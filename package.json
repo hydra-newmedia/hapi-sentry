@@ -27,20 +27,20 @@
   "author": "Christian Hotz <hotz@hydra-newmedia.com>",
   "license": "MIT",
   "peerDependencies": {
-    "hapi": ">=17"
+    "@hapi/hapi": ">=18"
   },
   "dependencies": {
-    "@sentry/node": "^4.2.4",
-    "hoek": "^6.1.2",
-    "joi": "^14.0.4"
+    "@sentry/node": "^5.4.3",
+    "@hapi/hoek": "^8.0.1",
+    "@hapi/joi": "^15.1.0"
   },
   "devDependencies": {
-    "@hydrant/eslint-config": "^2.0.1",
-    "ava": "^1.0.0-rc.2",
-    "eslint": "^5.8.0",
-    "eslint-plugin-ava": "^5.1.1",
-    "hapi": "^17.7.0",
-    "lint-staged": "^8.0.4",
-    "p-defer": "^1.0.0"
+    "@hydrant/eslint-config": "^2.1.0",
+    "ava": "^2.1.0",
+    "eslint": "^6.0.1",
+    "eslint-plugin-ava": "^7.1.0",
+    "@hapi/hapi": "^18.3.1",
+    "lint-staged": "^8.2.1",
+    "p-defer": "^3.0.0"
   }
 }
