@@ -73,3 +73,17 @@ server.route({
   },
 });
 ```
+
+## Capturing the request body
+
+`hapi-sentry` currently does not capture the body for performance reasons. You can use the following snippet to capture the body in all sentry errors:
+
+```js
+server.ext({
+  type: 'onRequest',
+  method(request, h) {
+    request.payload && request.sentryScope.setExtra('payload', request.payload);
+    return h.continue;
+  },
+});
+```
