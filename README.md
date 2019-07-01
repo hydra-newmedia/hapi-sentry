@@ -23,7 +23,6 @@ The plugin options, you can pass in while registering are the following:
 | property                  | type         | description                                                                                                                  |
 |:--------------------------|:-------------|:-----------------------------------------------------------------------------------------------------------------------------|
 | `baseUri`                 | string       | [uri](https://github.com/hapijs/joi/blob/master/API.md#stringurioptions) to be used as base for captured urls                |
-| `channels`                | \[string\]   | One or array of hapi [server.events](https://hapijs.com/api#-servereventevents) channels to be captured. Default: `'error'`  |
 | `trackUser`               | boolean      | Whether or not to track the user via the per-request scope. Default: `true`                                                  |
 | `scope.tags`              | object       | An array of tags to be sent with every event                                                                                 |
 | `scope.tags.name`         | string       | The name of a tag                                                                                                            |
@@ -42,8 +41,8 @@ The plugin options, you can pass in while registering are the following:
 | `client.beforeSend`       | func         | A callback invoked during event submission, allowing to optionally modify the event before it is sent to Sentry              |
 | `client.beforeBreadcrumb` | func         | A callback invoked when adding a breadcrumb, allowing to optionally modify it before adding it to future events.             |
 
-The `baseUri` and `channels` options are used internally,
-the `scope` option is used to set up a global
+The `baseUri` option is used internally to get a correct URL in sentry issues.
+The `scope` option is used to set up a global
 [`Scope`](http://getsentry.github.io/sentry-javascript/classes/hub.scope.html)
 for all events and the
 [`client`](http://getsentry.github.io/sentry-javascript/interfaces/node.nodeoptions.html) option

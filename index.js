@@ -38,8 +38,8 @@ exports.register = (server, options) => {
     },
   });
 
-  // catch request errors/warnings/etc (default: only errors) and capture them with sentry
-  server.events.on({ name: 'request', channels: opts.channels }, async (request, event) => {
+  // get request errors to capture them with sentry
+  server.events.on({ name: 'request', channels: ['error'] }, async (request, event) => {
     Sentry.withScope(scope => { // thus use a temp scope and re-assign it
       scope.addEventProcessor(_sentryEvent => {
         // format a sentry event from the request and triggered event
