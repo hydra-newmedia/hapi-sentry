@@ -58,8 +58,7 @@ The internally used client (initialized in either way) is accessible through
 
 ## Own Sentry instance
 
-You can pass a `Sentry` instance to  the `client` option if you already initialized your own.
-Example:
+You can pass a `Sentry` instance to  the `client` option if you already initialized your own like this:
 
 ```js
 const server = hapi.server();
