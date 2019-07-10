@@ -13,7 +13,12 @@ request error logging to [Sentry](https://sentry.io/).
 Use the hapi plugin like this:
 ```JavaScript
 const server = hapi.server();
-await server.register({ plugin: require('hapi-sentry'), options });
+await server.register({ 
+  plugin: require('hapi-sentry'), 
+  options: {
+    client: { dsn: 'dsn-here' },
+  },
+});
 ```
 
 ## Options
@@ -47,8 +52,20 @@ The `scope` option is used to set up a global
 for all events and the
 [`client`](http://getsentry.github.io/sentry-javascript/interfaces/node.nodeoptions.html) option
 is used as a Sentry instance or to initialize an internally used Sentry instance.
+
 The internally used client (initialized in either way) is accessible through
 `server.plugins['hapi-sentry'].client`.
+
+## Own Sentry instance
+
+You can pass a `Sentry` instance to  the `client` option if you already initialized your own like this:
+
+```js
+const server = hapi.server();
+const Sentry = require('sentry');
+Sentry.init({ dsn: 'dsn-here' });
+await server.register({ plugin: require('hapi-sentry'), { client: Sentry } });
+```
 
 ## Scope
 
