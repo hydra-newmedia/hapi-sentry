@@ -67,7 +67,7 @@ exports.register = (server, options) => {
         return sentryEvent;
       });
 
-      Hoek.applyToDefaults(scope, request.sentryScope);
+      Hoek.merge(scope, request.sentryScope);
       Sentry.captureException(event.error);
     });
   });
