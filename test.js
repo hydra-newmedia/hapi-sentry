@@ -81,10 +81,9 @@ test('uses a custom sentry client', async t => {
   const deferred = defer();
   const customSentry = {
     Scope: class Scope {},
-    /* eslint-disable no-unused-vars */ // arity needed to pass joi validation
-    Handlers: { parseRequest: (x, y) => { } },
+    // arity needed to pass joi validation
+    Handlers: { parseRequest: (x, y) => { } }, // eslint-disable-line no-unused-vars
     withScope: cb => cb({ addEventProcessor: () => { } }),
-    /* eslint-enable no-unused-var */
     captureException: deferred.resolve,
   };
 
