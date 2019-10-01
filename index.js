@@ -39,7 +39,11 @@ exports.register = (server, options) => {
   });
 
   // get request errors to capture them with sentry
-  server.events.on({ name: 'request', channels: ['error'] }, async (request, event) => {
+  server.events.on({ name: 'request', channels: ['error', 'app'] }, async (request, event, tags) => {
+    if (event.channel === 'app' && !tags.error) {
+      return;
+    }
+
     Sentry.withScope(scope => { // thus use a temp scope and re-assign it
       scope.addEventProcessor(_sentryEvent => {
         // format a sentry event from the request and triggered event
@@ -51,8 +55,7 @@ exports.register = (server, options) => {
           sentryEvent.request.url = opts.baseUri + request.path;
         }
 
-        // set severity according to the filters channel
-        sentryEvent.level = event.channel;
+        sentryEvent.level = 'error';
 
         // use request credentials for capturing user
         if (opts.trackUser) sentryEvent.user = request.auth && request.auth.credentials;
