@@ -260,7 +260,7 @@ test('sanitizes user info from auth', async t => {
   t.deepEqual(event.user, { username: 'me' });
 });
 
-test("process 'app' channel events with 'error' tag", async t => {
+test('process \'app\' channel events with \'error\' tag', async t => {
   const { server } = t.context;
 
   server.route({
@@ -293,13 +293,13 @@ test("process 'app' channel events with 'error' tag", async t => {
   t.is(event.exception.values[0].type, 'Error');
 });
 
-test("process 'log' events with 'error' tag", async t => {
+test('process \'log\' events with \'error\' tag', async t => {
   const { server } = t.context;
 
   server.route({
     method: 'GET',
     path: '/route',
-    handler(request) {
+    handler() {
       server.log(['error', 'foo'], new Error('Oh no!'));
       return null;
     },

@@ -75,7 +75,7 @@ exports.register = (server, options) => {
     });
   });
 
-  server.events.on('log', (event, tags) =>  {
+  server.events.on('log', (event, tags) => {
     if (!tags.error || !event.error) {
       return;
     }
