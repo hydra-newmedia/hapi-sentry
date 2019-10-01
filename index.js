@@ -39,7 +39,7 @@ exports.register = (server, options) => {
   });
 
   // get request errors to capture them with sentry
-  server.events.on({ name: 'request', channels: ['error', 'app'] }, async (request, event, tags) => {
+  server.events.on({ name: 'request', channels: ['error', 'app'] }, (request, event, tags) => {
     if (event.channel === 'app' && !tags.error) {
       return;
     }
@@ -75,6 +75,23 @@ exports.register = (server, options) => {
     });
   });
 
+  server.events.on('log', (event, tags) =>  {
+    if (!tags.error) {
+      return;
+    }
+
+    Sentry.withScope(scope => {
+      scope.addEventProcessor(sentryEvent => {
+        sentryEvent.level = 'error';
+
+        // some SDK identificator
+        sentryEvent.sdk = { name: 'sentry.javascript.node.hapi', version };
+        return sentryEvent;
+      });
+
+      Sentry.captureException(event.error);
+    });
+  });
 };
 
 exports.name = name;

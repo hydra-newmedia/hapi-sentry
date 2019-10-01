@@ -260,7 +260,7 @@ test('sanitizes user info from auth', async t => {
   t.deepEqual(event.user, { username: 'me' });
 });
 
-test("process events on 'app' channel with 'error' tag", async t => {
+test("process 'app' channel events with 'error' tag", async t => {
   const { server } = t.context;
 
   server.route({
@@ -268,6 +268,39 @@ test("process events on 'app' channel with 'error' tag", async t => {
     path: '/route',
     handler(request) {
       request.log(['error', 'foo'], new Error('Oh no!'));
+      return null;
+    },
+  });
+
+  const deferred = defer();
+  await server.register({
+    plugin,
+    options: {
+      client: {
+        dsn,
+        beforeSend: deferred.resolve,
+      },
+    },
+  });
+
+  await server.inject({
+    method: 'GET',
+    url: '/route',
+  });
+
+  const event = await deferred.promise;
+  t.is(event.exception.values[0].value, 'Oh no!');
+  t.is(event.exception.values[0].type, 'Error');
+});
+
+test("process 'log' events with 'error' tag", async t => {
+  const { server } = t.context;
+
+  server.route({
+    method: 'GET',
+    path: '/route',
+    handler(request) {
+      server.log(['error', 'foo'], new Error('Oh no!'));
       return null;
     },
   });
