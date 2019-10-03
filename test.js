@@ -280,6 +280,7 @@ test('process \'app\' channel events with \'error\' tag', async t => {
         dsn,
         beforeSend: deferred.resolve,
       },
+      catchLogErrors: true,
     },
   });
 
@@ -313,6 +314,7 @@ test('process \'log\' events with \'error\' tag', async t => {
         dsn,
         beforeSend: deferred.resolve,
       },
+      catchLogErrors: true,
     },
   });
 
