@@ -40,7 +40,8 @@ exports.register = (server, options) => {
 
   // get request errors to capture them with sentry
   server.events.on({ name: 'request', channels: ['error', 'app'] }, (request, event, tags) => {
-    if (event.channel === 'app' && (!tags.error || !event.error)) {
+    if (event.channel === 'app' &&
+      !(opts.catchLogErrors && tags.error && event.error)) {
       return;
     }
 
@@ -76,7 +77,7 @@ exports.register = (server, options) => {
   });
 
   server.events.on('log', (event, tags) => {
-    if (!tags.error || !event.error) {
+    if (!(opts.catchLogErrors && tags.error && event.error)) {
       return;
     }
 
