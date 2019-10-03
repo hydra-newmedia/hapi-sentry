@@ -32,4 +32,5 @@ module.exports = joi.object().keys({
     extra: joi.object(),
   }),
   client: joi.alternatives().try([sentryOptions, sentryClient]).required(),
+  catchLogErrors: joi.boolean().default(false),
 });

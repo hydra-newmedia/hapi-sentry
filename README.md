@@ -13,8 +13,8 @@ request error logging to [Sentry](https://sentry.io/).
 Use the hapi plugin like this:
 ```JavaScript
 const server = hapi.server();
-await server.register({ 
-  plugin: require('hapi-sentry'), 
+await server.register({
+  plugin: require('hapi-sentry'),
   options: {
     client: { dsn: 'dsn-here' },
   },
@@ -45,6 +45,7 @@ The plugin options, you can pass in while registering are the following:
 | `client.serverName`       | string       | Overwrite the server name (device name)                                                                                      |
 | `client.beforeSend`       | func         | A callback invoked during event submission, allowing to optionally modify the event before it is sent to Sentry              |
 | `client.beforeBreadcrumb` | func         | A callback invoked when adding a breadcrumb, allowing to optionally modify it before adding it to future events.             |
+| `catchLogErrors` | boolean | Whether or not to capture errors logged via `server.log` or `request.log`. Events must contain an `'error'` tag and pass an `Error` instance as data. Default: `false` |
 
 The `baseUri` option is used internally to get a correct URL in sentry issues.
 The `scope` option is used to set up a global
