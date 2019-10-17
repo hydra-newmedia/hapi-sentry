@@ -50,7 +50,7 @@ exports.register = (server, options) => {
   function shouldIgnoreEvent(event) {
     const match = catchLogErrors &&
       event.error &&
-      errorTags.reduce((cond, tag) => cond || event.tags.includes(tag), false)
+      errorTags.reduce((cond, tag) => cond || event.tags.includes(tag), false);
 
     return event.channel === 'app' && !match;
   }
