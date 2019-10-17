@@ -38,10 +38,26 @@ exports.register = (server, options) => {
     },
   });
 
+  let catchLogErrors = false;
+  let errorTags = ['error', 'fatal', 'fail'];
+  if (opts.catchLogErrors) {
+    catchLogErrors = true;
+    if (Array.isArray(opts.catchLogErrors)) {
+      errorTags = opts.catchLogErrors;
+    }
+  }
+
+  function shouldIgnoreEvent(event) {
+    const match = catchLogErrors &&
+      event.error &&
+      errorTags.reduce((cond, tag) => cond || event.tags.includes(tag), false)
+
+    return event.channel === 'app' && !match;
+  }
+
   // get request errors to capture them with sentry
-  server.events.on({ name: 'request', channels: ['error', 'app'] }, (request, event, tags) => {
-    if (event.channel === 'app' &&
-      !(opts.catchLogErrors && tags.error && event.error)) {
+  server.events.on({ name: 'request', channels: ['error', 'app'] }, (request, event) => {
+    if (shouldIgnoreEvent(event)) {
       return;
     }
 
@@ -76,8 +92,8 @@ exports.register = (server, options) => {
     });
   });
 
-  server.events.on('log', (event, tags) => {
-    if (!(opts.catchLogErrors && tags.error && event.error)) {
+  server.events.on('log', event => {
+    if (shouldIgnoreEvent(event)) {
       return;
     }
 
