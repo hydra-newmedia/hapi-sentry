@@ -38,27 +38,21 @@ exports.register = (server, options) => {
     },
   });
 
-  let catchLogErrors = false;
   let errorTags = ['error', 'fatal', 'fail'];
-  if (opts.catchLogErrors) {
-    catchLogErrors = true;
-    if (Array.isArray(opts.catchLogErrors)) {
-      errorTags = opts.catchLogErrors;
-    }
+  if (opts.catchLogErrors && Array.isArray(opts.catchLogErrors)) {
+    errorTags = opts.catchLogErrors;
   }
 
-  function shouldIgnoreEvent(event) {
-    const match = catchLogErrors &&
-      event.error &&
-      errorTags.reduce((cond, tag) => cond || event.tags.includes(tag), false);
-
-    return event.channel === 'app' && !match;
-  }
+  const channels = ['error'];
+  // also listen for app events to get log messages
+  if (opts.catchLogErrors) channels.push('app');
 
   // get request errors to capture them with sentry
-  server.events.on({ name: 'request', channels: ['error', 'app'] }, (request, event) => {
-    if (shouldIgnoreEvent(event)) {
-      return;
+  server.events.on({ name: 'request', channels }, (request, event) => {
+    // check for errors in request logs
+    if (event.channel === 'app') {
+      if (!event.error) return; // no error, just a log message
+      if (event.tags.some(tag => errorTags.includes(tag)) === false) return; // no matching tag
     }
 
     Sentry.withScope(scope => { // thus use a temp scope and re-assign it
@@ -92,23 +86,24 @@ exports.register = (server, options) => {
     });
   });
 
-  server.events.on('log', event => {
-    if (shouldIgnoreEvent(event)) {
-      return;
-    }
+  if (opts.catchLogErrors) {
+    server.events.on({ name: 'log', channels: ['app'] }, event => {
+      if (!event.error) return; // no error, just a log message
+      if (event.tags.some(tag => errorTags.includes(tag)) === false) return; // no matching tag
 
-    Sentry.withScope(scope => {
-      scope.addEventProcessor(sentryEvent => {
-        sentryEvent.level = 'error';
+      Sentry.withScope(scope => {
+        scope.addEventProcessor(sentryEvent => {
+          sentryEvent.level = 'error';
 
-        // some SDK identificator
-        sentryEvent.sdk = { name: 'sentry.javascript.node.hapi', version };
-        return sentryEvent;
+          // some SDK identificator
+          sentryEvent.sdk = { name: 'sentry.javascript.node.hapi', version };
+          return sentryEvent;
+        });
+
+        Sentry.captureException(event.error);
       });
-
-      Sentry.captureException(event.error);
     });
-  });
+  }
 };
 
 exports.name = name;
