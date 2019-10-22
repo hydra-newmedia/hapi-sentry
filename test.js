@@ -259,3 +259,139 @@ test('sanitizes user info from auth', async t => {
   const event = await deferred.promise;
   t.deepEqual(event.user, { username: 'me' });
 });
+
+test('process \'app\' channel events with default tags', async t => {
+  const { server } = t.context;
+
+  server.route({
+    method: 'GET',
+    path: '/route',
+    handler(request) {
+      request.log(['error', 'foo'], new Error('Oh no!'));
+      return null;
+    },
+  });
+
+  const deferred = defer();
+  await server.register({
+    plugin,
+    options: {
+      client: {
+        dsn,
+        beforeSend: deferred.resolve,
+      },
+      catchLogErrors: true,
+    },
+  });
+
+  await server.inject({
+    method: 'GET',
+    url: '/route',
+  });
+
+  const event = await deferred.promise;
+  t.is(event.exception.values[0].value, 'Oh no!');
+  t.is(event.exception.values[0].type, 'Error');
+});
+
+test('process \'app\' channel events with `catchLogErrors` tags', async t => {
+  const { server } = t.context;
+
+  server.route({
+    method: 'GET',
+    path: '/route',
+    handler(request) {
+      request.log('exception', new Error('Oh no!'));
+      return null;
+    },
+  });
+
+  const deferred = defer();
+  await server.register({
+    plugin,
+    options: {
+      client: {
+        dsn,
+        beforeSend: deferred.resolve,
+      },
+      catchLogErrors: ['exception', 'failure'],
+    },
+  });
+
+  await server.inject({
+    method: 'GET',
+    url: '/route',
+  });
+
+  const event = await deferred.promise;
+  t.is(event.exception.values[0].value, 'Oh no!');
+  t.is(event.exception.values[0].type, 'Error');
+});
+
+test('process \'log\' events with default tags', async t => {
+  const { server } = t.context;
+
+  server.route({
+    method: 'GET',
+    path: '/route',
+    handler() {
+      server.log(['error', 'foo'], new Error('Oh no!'));
+      return null;
+    },
+  });
+
+  const deferred = defer();
+  await server.register({
+    plugin,
+    options: {
+      client: {
+        dsn,
+        beforeSend: deferred.resolve,
+      },
+      catchLogErrors: true,
+    },
+  });
+
+  await server.inject({
+    method: 'GET',
+    url: '/route',
+  });
+
+  const event = await deferred.promise;
+  t.is(event.exception.values[0].value, 'Oh no!');
+  t.is(event.exception.values[0].type, 'Error');
+});
+
+test('process \'log\' events with `catchLogErrors` tags', async t => {
+  const { server } = t.context;
+
+  server.route({
+    method: 'GET',
+    path: '/route',
+    handler() {
+      server.log('exception', new Error('Oh no!'));
+      return null;
+    },
+  });
+
+  const deferred = defer();
+  await server.register({
+    plugin,
+    options: {
+      client: {
+        dsn,
+        beforeSend: deferred.resolve,
+      },
+      catchLogErrors: ['exception', 'failure'],
+    },
+  });
+
+  await server.inject({
+    method: 'GET',
+    url: '/route',
+  });
+
+  const event = await deferred.promise;
+  t.is(event.exception.values[0].value, 'Oh no!');
+  t.is(event.exception.values[0].type, 'Error');
+});

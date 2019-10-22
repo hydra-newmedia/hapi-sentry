@@ -38,8 +38,23 @@ exports.register = (server, options) => {
     },
   });
 
+  let errorTags = ['error', 'fatal', 'fail'];
+  if (opts.catchLogErrors && Array.isArray(opts.catchLogErrors)) {
+    errorTags = opts.catchLogErrors;
+  }
+
+  const channels = ['error'];
+  // also listen for app events to get log messages
+  if (opts.catchLogErrors) channels.push('app');
+
   // get request errors to capture them with sentry
-  server.events.on({ name: 'request', channels: ['error'] }, async (request, event) => {
+  server.events.on({ name: 'request', channels }, (request, event) => {
+    // check for errors in request logs
+    if (event.channel === 'app') {
+      if (!event.error) return; // no error, just a log message
+      if (event.tags.some(tag => errorTags.includes(tag)) === false) return; // no matching tag
+    }
+
     Sentry.withScope(scope => { // thus use a temp scope and re-assign it
       scope.addEventProcessor(_sentryEvent => {
         // format a sentry event from the request and triggered event
@@ -51,8 +66,7 @@ exports.register = (server, options) => {
           sentryEvent.request.url = opts.baseUri + request.path;
         }
 
-        // set severity according to the filters channel
-        sentryEvent.level = event.channel;
+        sentryEvent.level = 'error';
 
         // use request credentials for capturing user
         if (opts.trackUser) sentryEvent.user = request.auth && request.auth.credentials;
@@ -72,6 +86,24 @@ exports.register = (server, options) => {
     });
   });
 
+  if (opts.catchLogErrors) {
+    server.events.on({ name: 'log', channels: ['app'] }, event => {
+      if (!event.error) return; // no error, just a log message
+      if (event.tags.some(tag => errorTags.includes(tag)) === false) return; // no matching tag
+
+      Sentry.withScope(scope => {
+        scope.addEventProcessor(sentryEvent => {
+          sentryEvent.level = 'error';
+
+          // some SDK identificator
+          sentryEvent.sdk = { name: 'sentry.javascript.node.hapi', version };
+          return sentryEvent;
+        });
+
+        Sentry.captureException(event.error);
+      });
+    });
+  }
 };
 
 exports.name = name;
