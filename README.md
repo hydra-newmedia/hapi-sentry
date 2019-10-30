@@ -65,7 +65,7 @@ You can pass a `Sentry` instance to  the `client` option if you already initiali
 const server = hapi.server();
 const Sentry = require('sentry');
 Sentry.init({ dsn: 'dsn-here' });
-await server.register({ plugin: require('hapi-sentry'), { client: Sentry } });
+await server.register({ plugin: require('hapi-sentry'), options: { client: Sentry } });
 ```
 
 ## Scope
