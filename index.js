@@ -33,11 +33,13 @@ exports.register = (server, options) => {
   server.ext({
     type: 'onRequest',
     method(request, h) {
-      // Sentry looks for current hub in active domain
-      // Therefore simply by creating&entering domain Sentry will create
-      // request scoped hub for breadcrumps and other scope metadata
-      request.__sentryDomain = domain.create();
-      request.__sentryDomain.enter();
+      if (opts.useDomainPerRequest) {
+        // Sentry looks for current hub in active domain
+        // Therefore simply by creating&entering domain Sentry will create
+        // request scoped hub for breadcrumps and other scope metadata
+        request.__sentryDomain = domain.create();
+        request.__sentryDomain.enter();
+      }
 
       // attach a new scope to each request for breadcrumbs/tags/extras/etc capturing
       request.sentryScope = new Sentry.Scope();
@@ -94,13 +96,15 @@ exports.register = (server, options) => {
     });
   });
 
-  server.events.on('response', request => {
-    if (request.__sentryDomain) {
-      // exiting domain, not sure if thats necessary, hard to find definitive answer,
-      // but its safer to prevent potentional memory leaks
-      request.__sentryDomain.exit();
-    }
-  });
+  if (opts.useDomainPerRequest) {
+    server.events.on('response', request => {
+      if (request.__sentryDomain) {
+        // exiting domain, not sure if thats necessary, hard to find definitive answer,
+        // but its safer to prevent potentional memory leaks
+        request.__sentryDomain.exit();
+      }
+    });
+  }
 
   if (opts.catchLogErrors) {
     server.events.on({ name: 'log', channels: ['app'] }, event => {

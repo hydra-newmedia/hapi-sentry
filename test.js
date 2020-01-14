@@ -242,6 +242,7 @@ test('collects breadcrumbs per domain', async t => {
   await server.register({
     plugin,
     options: {
+      useDomainPerRequest: true,
       client: {
         dsn,
         beforeSend(event) {
