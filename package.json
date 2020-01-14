@@ -32,7 +32,8 @@
   "dependencies": {
     "@hapi/hoek": "^9.0.2",
     "@hapi/joi": "^15.1.0",
-    "@sentry/node": "^5.4.3"
+    "@sentry/node": "^5.4.3",
+    "delay": "^4.3.0"
   },
   "devDependencies": {
     "@hapi/hapi": "^19.0.2",
