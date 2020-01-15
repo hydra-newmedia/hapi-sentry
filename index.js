@@ -42,7 +42,7 @@ exports.register = (server, options) => {
       }
 
       // attach a new scope to each request for breadcrumbs/tags/extras/etc capturing
-      request.sentryScope = Sentry.getCurrentHub().getScope();
+      request.sentryScope = new Sentry.Scope();
 
       return h.continue;
     },
