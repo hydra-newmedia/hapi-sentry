@@ -36,4 +36,5 @@ module.exports = joi.object().keys({
     joi.boolean(),
     joi.array().items(joi.string()),
   ).default(false),
+  useDomainPerRequest: joi.boolean().default(false),
 });

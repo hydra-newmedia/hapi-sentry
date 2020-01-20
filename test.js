@@ -3,6 +3,8 @@
 const test = require('ava');
 const hapi = require('@hapi/hapi');
 const defer = require('p-defer');
+const delay = require('delay');
+
 const plugin = require('./');
 
 const dsn = 'https://user@sentry.io/project';
@@ -81,6 +83,13 @@ test('uses a custom sentry client', async t => {
   const deferred = defer();
   const customSentry = {
     Scope: class Scope {},
+    getCurrentHub() {
+      return {
+        getScope() {
+          return {};
+        },
+      };
+    },
     // arity needed to pass joi validation
     Handlers: { parseRequest: (x, y) => { } }, // eslint-disable-line no-unused-vars
     withScope: cb => cb({ addEventProcessor: () => { } }),
@@ -208,6 +217,83 @@ test('parses request metadata', async t => {
   t.is(request.method, 'GET');
   t.is(typeof request.headers, 'object');
   t.is(request.url, `http://${request.headers.host}/route`);
+});
+
+// sorry for console.log being the easiest way to set breadcrumbs
+test('collects breadcrumbs per domain', async t => {
+  const { server } = t.context;
+
+
+  server.route({
+    method: 'GET',
+    path: '/route1',
+    async handler() {
+      await delay(400);
+      clearInterval(interval);
+      throw new Error('Error 1');
+    },
+  });
+
+  server.route({
+    method: 'GET',
+    path: '/route2',
+    async handler() {
+      await delay(200);
+      console.log('domain breadcrumb');
+      throw new Error('Error 2');
+    },
+  });
+
+  const deferred1 = defer();
+  const deferred2 = defer();
+  await server.register({
+    plugin,
+    options: {
+      useDomainPerRequest: true,
+      client: {
+        dsn,
+        beforeSend(event) {
+          const { request } = event;
+          if (request.url === `http://${request.headers.host}/route1`) {
+            return deferred1.resolve(event);
+          }
+          return deferred2.resolve(event);
+        },
+      },
+    },
+  });
+
+  let n = 1;
+  const interval = setInterval(() => console.log(`global breadcrumb ${n++}`), 60);
+
+  await Promise.all([
+    server.inject({ method: 'GET', url: '/route1' }),
+    server.inject({ method: 'GET', url: '/route2' }),
+  ]);
+
+  // /route1 should not see local breadcrumb of /route2
+  const event1 = await deferred1.promise;
+  t.is(event1.exception.values[0].value, 'Error 1');
+  const event1Breadcrumbs = event1.breadcrumbs.map(b => b.message);
+  const breadcrumbs1 = [
+    // /route2 consumes number 1 to 3, leaves 4 to 6 for /route1
+    'global breadcrumb 4',
+    'global breadcrumb 5',
+    'global breadcrumb 6',
+  ];
+  t.true(breadcrumbs1.every(b => event1Breadcrumbs.includes(b)));
+
+  const event2 = await deferred2.promise;
+  t.is(event2.exception.values[0].value, 'Error 2');
+  const event2Breadcrumbs = event2.breadcrumbs.map(b => b.message);
+  const breadcrumbs2 = [
+    'global breadcrumb 1',
+    'global breadcrumb 2',
+    'global breadcrumb 3',
+    'domain breadcrumb',
+  ];
+  t.true(event2Breadcrumbs.some(b => b.includes('[DEP0097]'))); // yeah, domains are deprecated
+  t.true(breadcrumbs2.every(b => event2Breadcrumbs.includes(b)));
 });
 
 test('sanitizes user info from auth', async t => {
