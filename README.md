@@ -28,7 +28,6 @@ The plugin options, you can pass in while registering are the following:
 | property                  | type          | description                                                                                                                  |
 |:--------------------------|:--------------|:-----------------------------------------------------------------------------------------------------------------------------|
 | `baseUri`                 | string        | [uri](https://github.com/hapijs/joi/blob/master/API.md#stringurioptions) to be used as base for captured urls                |
-| `trackUser`               | boolean       | Whether or not to track the user via the per-request scope. Default: `true`                                                  |
 | `scope.tags`              | object        | An array of tags to be sent with every event                                                                                 |
 | `scope.tags.name`         | string        | The name of a tag                                                                                                            |
 | `scope.tags.value`        | any           | The value of a tag                                                                                                           |
@@ -45,7 +44,9 @@ The plugin options, you can pass in while registering are the following:
 | `client.serverName`       | string        | Overwrite the server name (device name)                                                                                      |
 | `client.beforeSend`       | func          | A callback invoked during event submission, allowing to optionally modify the event before it is sent to Sentry              |
 | `client.beforeBreadcrumb` | func          | A callback invoked when adding a breadcrumb, allowing to optionally modify it before adding it to future events.             |
+| `trackUser`               | boolean       | Whether or not to track the user via the per-request scope. Default: `true`                                                  |
 | `catchLogErrors`          | boolean/array | Handles [capturing server.log and request.log events](#capturing-serverlog-and-requestlog-events). Default: `false`          |
+| `useDomainPerRequest`     | boolean       | Whether or not to use [Domains](https://nodejs.org/docs/latest-v12.x/api/domain.html) for seperating request processing. Only activate this feature, if you really need to seperate breadcrumbs, etc. of requests. It utilizes a deprecated Node.js feature which reduces [performance](https://github.com/hydra-newmedia/hapi-sentry/pull/21#issuecomment-574602486). Default: `false` |
 
 The `baseUri` option is used internally to get a correct URL in sentry issues.
 The `scope` option is used to set up a global
