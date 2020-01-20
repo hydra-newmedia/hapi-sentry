@@ -7,13 +7,13 @@ const levels = Object.values(Severity).filter(level => typeof level === 'string'
   || ['fatal', 'error', 'warning', 'log', 'info', 'debug', 'critical'];
 
 const sentryClient = joi.object().keys({
-  configureScope: joi.func().minArity(1),
-  Scope: joi.func().required(),
+  configureScope: joi.function().minArity(1),
+  Scope: joi.function().required(),
   Handlers: joi.object().keys({
-    parseRequest: joi.func().minArity(2).required(),
+    parseRequest: joi.function().minArity(2).required(),
   }).unknown().required(),
-  withScope: joi.func().minArity(1).required(),
-  captureException: joi.func().minArity(1).required(),
+  withScope: joi.function().minArity(1).required(),
+  captureException: joi.function().minArity(1).required(),
 }).unknown();
 
 const sentryOptions = joi.object().keys({
@@ -28,10 +28,10 @@ module.exports = joi.object().keys({
       name: joi.string().required(),
       value: joi.any().required(),
     })),
-    level: joi.string().only(levels),
+    level: joi.string().valid(...levels),
     extra: joi.object(),
   }),
-  client: joi.alternatives().try([sentryOptions, sentryClient]).required(),
+  client: joi.alternatives().try(sentryOptions, sentryClient).required(),
   catchLogErrors: joi.alternatives().try(
     joi.boolean(),
     joi.array().items(joi.string()),
