@@ -27,8 +27,7 @@ test('requires a dsn or a Scope (sentry opts vs. sentry client)', async t => {
   });
 
   t.deepEqual(err.details.map(d => d.message), [
-    '"dsn" is required',
-    '"Scope" is required',
+    '"client" does not match any of the allowed types',
   ]);
 });
 
