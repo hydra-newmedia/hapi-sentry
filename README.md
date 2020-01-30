@@ -112,7 +112,7 @@ The considered tags can be changed by setting `catchLogErrors` to a custom array
 
 ```js
 server.ext({
-  type: 'onRequest',
+  type: 'onPostAuth',
   method(request, h) {
     request.payload && request.sentryScope.setExtra('payload', request.payload);
     return h.continue;
