@@ -5,12 +5,16 @@
   "main": "index.js",
   "scripts": {
     "test": "ava test.js --serial",
-    "precommit": "lint-staged",
     "lint": "eslint --ignore-path .gitignore .",
     "lint-fix": "eslint --fix --ignore-path .gitignore ."
   },
   "lint-staged": {
     "*.js": "eslint"
+  },
+  "husky": {
+    "hooks": {
+      "pre-commit": "lint-staged"
+    }
   },
   "eslintConfig": {
     "extends": [
@@ -41,7 +45,8 @@
     "delay": "4.3.0",
     "eslint": "6.8.0",
     "eslint-plugin-ava": "10.2.0",
-    "lint-staged": "10.0.7",
+    "husky": "^4.2.3",
+    "lint-staged": "10.0.8",
     "p-defer": "3.0.0"
   }
 }
