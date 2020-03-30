@@ -1,5 +1,22 @@
 {
   "extends": [
     "config:base"
+  ],
+  "packageRules": [
+    {
+      "packagePatterns": ["eslint"],
+      "groupName": "eslint",
+      "automerge": true,
+      "automergeType": "branch"
+    },
+    {
+      "packageNames": [
+        "delay",
+        "ava",
+        "p-defer"
+      ],
+      "automerge": true,
+      "automergeType": "branch"
+    }
   ]
 }
