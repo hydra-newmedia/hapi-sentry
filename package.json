@@ -46,7 +46,7 @@
     "eslint": "7.1.0",
     "eslint-plugin-ava": "10.3.0",
     "husky": "4.2.5",
-    "lint-staged": "10.2.2",
+    "lint-staged": "10.2.7",
     "p-defer": "3.0.0"
   }
 }
