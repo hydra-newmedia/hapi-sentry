@@ -31,12 +31,12 @@
   "author": "Christian Hotz <hotz@hydra-newmedia.com>",
   "license": "MIT",
   "peerDependencies": {
-    "@hapi/hapi": "^19.0.0"
+    "@hapi/hapi": "^19.0.0 || ^20.0.0"
   },
   "dependencies": {
     "@hapi/hoek": "^9.0.2",
-    "@hapi/joi": "^17.1.0",
-    "@sentry/node": "^5.4.3"
+    "@sentry/node": "^5.4.3",
+    "joi": "^17.2.0"
   },
   "devDependencies": {
     "@hapi/hapi": "19.1.1",

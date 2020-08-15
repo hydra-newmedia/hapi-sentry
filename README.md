@@ -27,7 +27,7 @@ The plugin options, you can pass in while registering are the following:
 
 | property                  | type          | description                                                                                                                  |
 |:--------------------------|:--------------|:-----------------------------------------------------------------------------------------------------------------------------|
-| `baseUri`                 | string        | [uri](https://github.com/hapijs/joi/blob/master/API.md#stringurioptions) to be used as base for captured urls                |
+| `baseUri`                 | string        | [uri](https://github.com/sideway/joi/blob/master/API.md#stringurioptions) to be used as base for captured urls                |
 | `scope.tags`              | object        | An array of tags to be sent with every event                                                                                 |
 | `scope.tags.name`         | string        | The name of a tag                                                                                                            |
 | `scope.tags.value`        | any           | The value of a tag                                                                                                           |
