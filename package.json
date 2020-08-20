@@ -34,9 +34,9 @@
     "@hapi/hapi": "^19.0.0"
   },
   "dependencies": {
-    "@hapi/hoek": "^9.0.2",
+    "@hapi/hoek": "^9.0.4",
     "@hapi/joi": "^17.1.0",
-    "@sentry/node": "^5.4.3"
+    "@sentry/node": "^5.21.1"
   },
   "devDependencies": {
     "@hapi/hapi": "19.1.1",

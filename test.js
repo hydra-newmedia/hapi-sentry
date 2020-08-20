@@ -7,7 +7,7 @@ const delay = require('delay');
 
 const plugin = require('./');
 
-const dsn = 'https://user@sentry.io/project';
+const dsn = 'https://examplePublicKey@o0.ingest.sentry.io/0';
 
 test.beforeEach(t => {
   delete global.__SENTRY__;
