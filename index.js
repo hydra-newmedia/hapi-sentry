@@ -4,7 +4,7 @@ const { name, version } = require('./package.json');
 const schema = require('./schema');
 
 const Hoek = require('@hapi/hoek');
-const joi = require('@hapi/joi');
+const joi = require('joi');
 const domain = require('domain');
 
 exports.register = (server, options) => {

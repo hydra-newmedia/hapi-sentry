@@ -58,7 +58,7 @@ is used as a Sentry instance or to initialize an internally used Sentry instance
 The internally used client (initialized in either way) is accessible through
 `server.plugins['hapi-sentry'].client`.
 
-## Own Sentry instance
+## Using your own Sentry instance
 
 You can pass a `Sentry` instance to  the `client` option if you already initialized your own like this:
 
