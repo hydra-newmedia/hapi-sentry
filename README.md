@@ -23,7 +23,7 @@ await server.register({
 ```
 
 This setup will:
-* Initialiaze Sentry normally, which should capture all global errors and unhandled promise rejects
+* Initialize Sentry regularly, which should capture all global errors and unhandled promise rejects
 * Capture all unhandled exceptions thrown or returned in routes
 * Use request data and `request.auth.credentials` to enhance errors from routes
 
