@@ -44,7 +44,7 @@
   },
   "dependencies": {
     "@hapi/hoek": "^9.1.0",
-    "@sentry/node": "^5.22.3",
+    "@sentry/node": "^6.2.2",
     "joi": "^17.2.1"
   },
   "devDependencies": {
