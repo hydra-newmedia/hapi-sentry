@@ -1,11 +1,11 @@
 'use strict';
 
-const { name, version } = require('./package.json');
-const schema = require('./schema');
-
 const Hoek = require('@hapi/hoek');
 const joi = require('joi');
 const domain = require('domain');
+
+const { name, version } = require('./package.json');
+const schema = require('./schema');
 
 exports.register = (server, options) => {
   const opts = joi.attempt(options, schema, 'Invalid hapi-sentry options:');
@@ -13,6 +13,7 @@ exports.register = (server, options) => {
   let Sentry = opts.client;
   // initialize own sentry client if none passed as option
   if (opts.client.dsn !== undefined) {
+    // eslint-disable-next-line global-require
     Sentry = require('@sentry/node');
     Sentry.init(opts.client);
   }

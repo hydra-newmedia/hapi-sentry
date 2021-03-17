@@ -1,7 +1,8 @@
 # hapi-sentry
 
 [![package on npm](https://img.shields.io/npm/v/hapi-sentry.svg)](https://www.npmjs.com/package/hapi-sentry)
-[![Travis branch](https://travis-ci.com/hydra-newmedia/hapi-sentry.svg?branch=master)](https://travis-ci.com/hydra-newmedia/hapi-sentry)
+[![David](https://img.shields.io/david/hydra-newmedia/hapi-sentry)](https://david-dm.org/hydra-newmedia/hapi-sentry)
+[![GitHub Workflow Status](https://img.shields.io/github/workflow/status/hydra-newmedia/hapi-sentry/Node.js%20CI/master)](https://github.com/hydra-newmedia/hapi-sentry/actions/workflows/nodejs.yml)
 ![node 12+ required](https://img.shields.io/badge/node-12%2B-brightgreen.svg)
 [![GitHub license](https://img.shields.io/badge/license-MIT-blue.svg)](https://raw.githubusercontent.com/hydra-newmedia/hapi-sentry/master/LICENSE)
 
@@ -20,6 +21,13 @@ await server.register({
   },
 });
 ```
+
+This setup will:
+* Initialiaze Sentry normally, which should capture all global errors and unhandled promise rejects
+* Capture all unhandled exceptions thrown or returned in routes
+* Use request data and `request.auth.credentials` to enhance errors from routes
+
+You can use the following options to customize this behavior further.
 
 ## Options
 
