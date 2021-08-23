@@ -3,6 +3,7 @@
 const Hoek = require('@hapi/hoek');
 const joi = require('joi');
 const domain = require('domain');
+const eventsIntercept = require('events-intercept');
 
 const { name, version } = require('./package.json');
 const schema = require('./schema');
@@ -31,23 +32,43 @@ exports.register = (server, options) => {
   // expose sentry client at server.plugins['hapi-sentry'].client
   server.expose('client', Sentry);
 
-  server.ext({
-    type: 'onRequest',
-    method(request, h) {
-      if (opts.useDomainPerRequest) {
-        // Sentry looks for current hub in active domain
-        // Therefore simply by creating&entering domain Sentry will create
-        // request scoped hub for breadcrumps and other scope metadata
-        request.__sentryDomain = domain.create();
-        request.__sentryDomain.enter();
-      }
+  eventsIntercept.patch(server.listener)
 
-      // attach a new scope to each request for breadcrumbs/tags/extras/etc capturing
-      request.sentryScope = new Sentry.Scope();
+  const interceptor = (req, res, done) => {
+    const local = domain.create() // Create domain to hold context for request
+    local.enter()
+    local.add(req)
+    local.add(res)
 
-      return h.continue;
-    },
-  });
+    let rtn = undefined
+
+    local.run(() => { // Create new scope for request
+      const currentHub = Sentry.getCurrentHub();
+
+      currentHub.configureScope(scope => {
+        scope.addEventProcessor(_sentryEvent => {
+          // format a sentry event from the request and triggered event
+          const sentryEvent = Sentry.Handlers.parseRequest(_sentryEvent, req);
+
+          // overwrite events request url if a baseUrl is provided
+          if (opts.baseUri) {
+            if (opts.baseUri.slice(-1) === '/') opts.baseUri = opts.baseUri.slice(0, -1);
+            sentryEvent.request.url = opts.baseUri + request.path;
+          }
+
+          // some SDK identifier
+          sentryEvent.sdk = { name: 'sentry.javascript.node.hapi', version };
+          return sentryEvent;
+        });
+      })
+      rtn = done(null, req, res)
+    });
+
+    return rtn
+  }
+
+  server.listener.intercept('request', interceptor)
+  server.listener.intercept('checkContinue', interceptor)
 
   let errorTags = ['error', 'fatal', 'fail'];
   if (opts.catchLogErrors && Array.isArray(opts.catchLogErrors)) {
@@ -66,63 +87,15 @@ exports.register = (server, options) => {
       if (event.tags.some(tag => errorTags.includes(tag)) === false) return; // no matching tag
     }
 
-    Sentry.withScope(scope => { // thus use a temp scope and re-assign it
-      scope.addEventProcessor(_sentryEvent => {
-        // format a sentry event from the request and triggered event
-        const sentryEvent = Sentry.Handlers.parseRequest(_sentryEvent, request.raw.req);
-
-        // overwrite events request url if a baseUrl is provided
-        if (opts.baseUri) {
-          if (opts.baseUri.slice(-1) === '/') opts.baseUri = opts.baseUri.slice(0, -1);
-          sentryEvent.request.url = opts.baseUri + request.path;
-        }
-
-        sentryEvent.level = 'error';
-
-        // use request credentials for capturing user
-        if (opts.trackUser) sentryEvent.user = request.auth && request.auth.credentials;
-        if (sentryEvent.user) {
-          Object.keys(sentryEvent.user) // hide credentials
-            .filter(prop => /^(p(ass)?w(or)?(d|t)?|secret)?$/i.test(prop))
-            .forEach(prop => delete sentryEvent.user[prop]);
-        }
-
-        // some SDK identificator
-        sentryEvent.sdk = { name: 'sentry.javascript.node.hapi', version };
-        return sentryEvent;
-      });
-
-      Hoek.merge(scope, request.sentryScope);
-      Sentry.captureException(event.error);
-    });
+    Sentry.captureException(event.error);
   });
-
-  if (opts.useDomainPerRequest) {
-    server.events.on('response', request => {
-      if (request.__sentryDomain) {
-        // exiting domain, not sure if thats necessary, hard to find definitive answer,
-        // but its safer to prevent potentional memory leaks
-        request.__sentryDomain.exit();
-      }
-    });
-  }
 
   if (opts.catchLogErrors) {
     server.events.on({ name: 'log', channels: ['app'] }, event => {
       if (!event.error) return; // no error, just a log message
       if (event.tags.some(tag => errorTags.includes(tag)) === false) return; // no matching tag
 
-      Sentry.withScope(scope => {
-        scope.addEventProcessor(sentryEvent => {
-          sentryEvent.level = 'error';
-
-          // some SDK identificator
-          sentryEvent.sdk = { name: 'sentry.javascript.node.hapi', version };
-          return sentryEvent;
-        });
-
-        Sentry.captureException(event.error);
-      });
+      Sentry.captureException(event.error);
     });
   }
 };

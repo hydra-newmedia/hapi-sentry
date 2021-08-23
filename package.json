@@ -45,6 +45,7 @@
   "dependencies": {
     "@hapi/hoek": "^9.1.0",
     "@sentry/node": "^6.2.2",
+    "events-intercept": "^2.0.0",
     "joi": "^17.2.1"
   },
   "devDependencies": {
