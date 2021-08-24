@@ -4,6 +4,7 @@
 const domain = require('domain'); // eslint-disable-line node/no-deprecated-api
 const joi = require('joi');
 const shimmer = require('shimmer');
+const eventsIntercept = require('events-intercept');
 
 const { name, version } = require('./package.json');
 const schema = require('./schema');
@@ -63,7 +64,8 @@ exports.register = (server, options) => {
           return sentryEvent;
         });
       });
-      rtn = next.apply(this, [req, res].concat(args));
+
+      rtn = next.apply(this, [null, req, res].concat(args));
     });
 
     return rtn;
@@ -72,15 +74,29 @@ exports.register = (server, options) => {
   // Wrap HAPI core _dispatch function. This function is primary entry point into HAPI for an
   // external request. It's a factory that returns Node request handlers
   // https://github.com/hapijs/hapi/blob/c95985e225fa09c4b640a887ccb4be46dbe265bc/lib/core.js#L505-L539
-  if (!server._core._dispatch.__wrapped) {
+  if (server._core && server._core._dispatch && !server._core._dispatch.__wrapped) {
     shimmer.wrap(server._core, '_dispatch', function (original) { // eslint-disable-line
       return function _dispatch_wrapped(...dispatchArgs) { // eslint-disable-line
         const listener = original.apply(this, dispatchArgs);
 
-        return interceptor.bind(this, listener);
+        function next(err, ...args) {
+          listener.apply(this, args);
+        }
+
+        return interceptor.bind(this, next);
       };
     });
   }
+
+  // Setup listener interceptors so we can intercept inbound requests from Node, needed
+  // because we can't patch HAPI before it sets up listeners
+  eventsIntercept.patch(server.listener);
+  server.listener.intercept('request', function _requestInterceptor(...args) {
+    interceptor.apply(this, [args[args.length - 1], ...args.slice(0, -1)]);
+  });
+  server.listener.intercept('checkContinue', function _checkContinueInterceptor(...args) {
+    interceptor.apply(this, [args[args.length - 1], ...args.slice(0, -1)]);
+  });
 
   server.ext([
     {
