@@ -51,11 +51,13 @@
   },
   "dependencies": {
     "@sentry/node": "^6.2.2",
+    "events-intercept": "^2.0.0",
     "joi": "^17.2.1",
     "shimmer": "^1.2.1"
   },
   "devDependencies": {
     "@hapi/hapi": "^20.0.0",
+    "@hapi/shot": "^5.0.5",
     "ava": "^3.15.0",
     "eslint": "^7.32.0",
     "eslint-config-airbnb-base": "^14.2.1",

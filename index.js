@@ -4,6 +4,7 @@
 const domain = require('domain'); // eslint-disable-line node/no-deprecated-api
 const joi = require('joi');
 const shimmer = require('shimmer');
+const eventsIntercept = require('events-intercept');
 
 const { name, version } = require('./package.json');
 const schema = require('./schema');
@@ -33,16 +34,24 @@ exports.register = (server, options) => {
   server.expose('client', Sentry);
 
   // Set up request interceptor for creating and destroying a domain on each request
-  // It'll wrap the request handler returned by the _dispatch function in HAPI core
-  // allowing it to create the domain before any of HAPIs processing starts
-  // thus allowing us to use the normal HAPI extensions to add context to Sentry scopes
-  // https://github.com/hapijs/hapi/blob/c95985e225fa09c4b640a887ccb4be46dbe265bc/lib/core.js#L507-L538
+  // It'll intercept events emitted by the Hapi `server.listener` which is a `http.Server`
+  // eventEmitter. This allows us to to create a domain before any of HAPIs processing starts
+  // thus allowing us to use the normal HAPI extensions to add context to Sentry scopes.
   function interceptor(next, req, res, ...args) {
     const local = domain.create(); // Create domain to hold context for request
     local.add(req);
     local.add(res);
 
-    let rtn;
+    // The interceptor will call the original function being either intercepted or wrapped
+    // that function should only ever return `undefined` but it's good practice to always
+    // capture that value and pass it back upstream, just in case our original function
+    // decides to start returning something other than `undefined` in the future.
+    //
+    // We need to declare it here, because the body of our interceptor runs inside
+    // an anonymous function wrapped by the `domain` run function. So this declaration
+    // ensures we can pull the value out of anonymous function's scope and actually
+    // return it.
+    let originalFuncReturnValue;
 
     local.run(() => { // Create new scope for request
       const currentHub = Sentry.getCurrentHub();
@@ -63,24 +72,66 @@ exports.register = (server, options) => {
           return sentryEvent;
         });
       });
-      rtn = next.apply(this, [req, res].concat(args));
+
+      // Capture return value here
+      originalFuncReturnValue = next.apply(this, [null, req, res].concat(args));
     });
 
-    return rtn;
+    return originalFuncReturnValue;
   }
 
-  // Wrap HAPI core _dispatch function. This function is primary entry point into HAPI for an
-  // external request. It's a factory that returns Node request handlers
+  // Wrap HAPI core _dispatch function. It's a factory that returns Node request listeners.
+  // We need to wrap it to make Hapi's `server.inject()` API work, but the wrapped function
+  // isn't involved in normal request handling.
+  //
+  // Normal requests are intercepted before they get to the `_dispatch` function, and never pass
+  // through our wrapped `_dispatch` function because Hapi uses `_dispatch` function and binds
+  // the created request listeners to the eventEmitter before we have an opportunity to wrap it.
+  //
   // https://github.com/hapijs/hapi/blob/c95985e225fa09c4b640a887ccb4be46dbe265bc/lib/core.js#L505-L539
-  if (!server._core._dispatch.__wrapped) {
+  //
+  // We only wrap if it hasn't already been wrapped (as indicated by `__wrapped`)
+  if (server._core && server._core._dispatch && !server._core._dispatch.__wrapped) {
     shimmer.wrap(server._core, '_dispatch', function (original) { // eslint-disable-line
+
+      // Wrapper for `_dispatch`
       return function _dispatch_wrapped(...dispatchArgs) { // eslint-disable-line
+        // Call the original `_dispatch` function to get a request listener because we actually want
+        // to intercept calls to the listener, rather than to `_dispatch` itself.
         const listener = original.apply(this, dispatchArgs);
 
-        return interceptor.bind(this, listener);
+        // Create a `next` function compatible with our interceptor function.
+        // It simply extracts the err value and throws it away, passing the remaining arguments to
+        // the original listener.
+        // It safe to do this because our interceptor function never calls `next` with an error, it
+        // always passes null. Doing so because it's a requirement of the `eventInterceptor` library
+        function next(err, ...args) {
+          listener.apply(this, args);
+        }
+
+        // Bind the interceptor, to `this` and `next` so when the interceptor is called with a
+        // request it runs in the context that Hapi intended it to. Additionally the first argument
+        // to the interceptor will be `next`, followed by whatever arguments the original caller
+        // passes.
+        return interceptor.bind(this, next);
       };
     });
   }
+
+  // Setup listener interceptors so we can intercept inbound requests from Node, needed
+  // because we can't patch HAPI before it sets up listeners
+  eventsIntercept.patch(server.listener);
+  server.listener.intercept('request', function _requestInterceptor(...args) {
+    // Rearrange incoming arguments. The `eventsInterceptor` sends us arguments in the following
+    // order: `func(origArg1, ..., origArgN, nextFunc)` but we want the `nextFunc` to be first
+
+    // `func(origArg1, ..., origArgN, nextFunc)` -> `func(nextFunc, origArg1, ..., origArgN)`
+    interceptor.apply(this, [args[args.length - 1], ...args.slice(0, -1)]);
+  });
+  server.listener.intercept('checkContinue', function _checkContinueInterceptor(...args) {
+    // `func(origArg1, ..., origArgN, nextFunc)` -> `func(nextFunc, origArg1, ..., origArgN)`
+    interceptor.apply(this, [args[args.length - 1], ...args.slice(0, -1)]);
+  });
 
   server.ext([
     {

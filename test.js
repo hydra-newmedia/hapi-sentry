@@ -6,6 +6,7 @@
 
 const test = require('ava');
 const hapi = require('@hapi/hapi');
+const shot = require('@hapi/shot');
 const defer = require('p-defer');
 const Sentry = require('@sentry/node');
 
@@ -540,4 +541,37 @@ test('request scope separation', async t => {
 
   // Will cause test to time out if not fired
   await deferred.promise;
+});
+
+test('listener interceptors', async t => {
+  const { server } = t.context;
+
+  server.route({
+    method: 'GET',
+    path: '/',
+    handler() {
+      throw new Error('Oh no!');
+    },
+  });
+
+  const deferred = defer();
+  await server.register({
+    plugin,
+    options: {
+      client: {
+        dsn,
+        beforeSend: deferred.resolve,
+      },
+    },
+  });
+
+  await shot.inject((...args) => server.listener.emit('request', ...args), {
+    method: 'GET',
+    url: '/',
+    payload: t.title,
+  });
+
+  const event = await deferred.promise;
+  t.is(event.exception.values[0].value, 'Oh no!');
+  t.is(event.exception.values[0].type, 'Error');
 });
