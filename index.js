@@ -1,9 +1,9 @@
 'use strict';
 
-const Hoek = require('@hapi/hoek');
+// Domain is deprecated, but Sentry relies on it
+const domain = require('domain'); // eslint-disable-line node/no-deprecated-api
 const joi = require('joi');
-const domain = require('domain');
-const eventsIntercept = require('events-intercept');
+const shimmer = require('shimmer');
 
 const { name, version } = require('./package.json');
 const schema = require('./schema');
@@ -32,15 +32,17 @@ exports.register = (server, options) => {
   // expose sentry client at server.plugins['hapi-sentry'].client
   server.expose('client', Sentry);
 
-  eventsIntercept.patch(server.listener)
+  // Set up request interceptor for creating and destroying a domain on each request
+  // It'll wrap the request handler returned by the _dispatch function in HAPI core
+  // allowing it to create the domain before any of HAPIs processing starts
+  // thus allowing us to use the normal HAPI extensions to add context to Sentry scopes
+  // https://github.com/hapijs/hapi/blob/c95985e225fa09c4b640a887ccb4be46dbe265bc/lib/core.js#L507-L538
+  function interceptor(next, req, res, ...args) {
+    const local = domain.create(); // Create domain to hold context for request
+    local.add(req);
+    local.add(res);
 
-  const interceptor = (req, res, done) => {
-    const local = domain.create() // Create domain to hold context for request
-    local.enter()
-    local.add(req)
-    local.add(res)
-
-    let rtn = undefined
+    let rtn;
 
     local.run(() => { // Create new scope for request
       const currentHub = Sentry.getCurrentHub();
@@ -53,22 +55,59 @@ exports.register = (server, options) => {
           // overwrite events request url if a baseUrl is provided
           if (opts.baseUri) {
             if (opts.baseUri.slice(-1) === '/') opts.baseUri = opts.baseUri.slice(0, -1);
-            sentryEvent.request.url = opts.baseUri + request.path;
+            sentryEvent.request.url = opts.baseUri + req.path;
           }
 
           // some SDK identifier
           sentryEvent.sdk = { name: 'sentry.javascript.node.hapi', version };
           return sentryEvent;
         });
-      })
-      rtn = done(null, req, res)
+      });
+      rtn = next.apply(this, [req, res].concat(args));
     });
 
-    return rtn
+    return rtn;
   }
 
-  server.listener.intercept('request', interceptor)
-  server.listener.intercept('checkContinue', interceptor)
+  // Wrap HAPI core _dispatch function. This function is primary entry point into HAPI for an
+  // external request. It's a factory that returns Node request handlers
+  // https://github.com/hapijs/hapi/blob/c95985e225fa09c4b640a887ccb4be46dbe265bc/lib/core.js#L505-L539
+  if (!server._core._dispatch.__wrapped) {
+    shimmer.wrap(server._core, '_dispatch', function (original) { // eslint-disable-line
+      return function _dispatch_wrapped(...dispatchArgs) { // eslint-disable-line
+        const listener = original.apply(this, dispatchArgs);
+
+        return interceptor.bind(this, listener);
+      };
+    });
+  }
+
+  server.ext([
+    {
+      type: 'onRequest',
+      method: (request, h) => {
+        // To maintain backwards compatibility attached the Hub scope to the request
+        request.sentryScope = Sentry.getCurrentHub().getScope();
+        return h.continue;
+      },
+    },
+    {
+      type: 'onCredentials',
+      method: (request, h) => {
+        Sentry.configureScope(scope => {
+          // use request credentials for current scope
+          if (opts.trackUser && request.auth && request.auth.credentials) {
+            const creds = { ...request.auth.credentials };
+            Object.keys(creds) // hide credentials
+              .filter(prop => /^(p(ass)?w(or)?(d|t)?|secret)?$/i.test(prop))
+              .forEach(prop => delete creds[prop]);
+            scope.setUser(creds);
+          }
+        });
+
+        return h.continue;
+      },
+    }]);
 
   let errorTags = ['error', 'fatal', 'fail'];
   if (opts.catchLogErrors && Array.isArray(opts.catchLogErrors)) {
