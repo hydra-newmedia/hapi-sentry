@@ -1,72 +1,88 @@
 /* eslint-disable max-classes-per-file */
-/* eslint import/no-extraneous-dependencies: ["error", {"devDependencies": true}] */
-/* eslint-disable node/no-unpublished-require */
 
-'use strict';
+"use strict";
 
-const test = require('ava');
-const hapi = require('@hapi/hapi');
-const shot = require('@hapi/shot');
-const defer = require('p-defer');
-const Sentry = require('@sentry/node');
+import anyTest, { TestInterface } from "ava";
+import hapi = require("@hapi/hapi");
+import shot = require("@hapi/shot");
+import defer = require("p-defer");
+import Sentry = require("@sentry/node");
+import type { TransportClass, Transport } from "@sentry/types";
 
-const plugin = require('.');
+import * as plugin from ".";
+import { ZodError } from "zod";
 
-const dsn = 'https://examplePublicKey@o0.ingest.sentry.io/0';
+const dsn = "https://examplePublicKey@o0.ingest.sentry.io/0";
 
-test.beforeEach(t => {
-  delete global.__SENTRY__;
+const test = anyTest as TestInterface<{ server: hapi.Server }>;
+
+interface globalSentry {
+  // eslint-disable-next-line @typescript-eslint/no-explicit-any
+  __SENTRY__?: any;
+}
+
+test.beforeEach((t) => {
+  delete (global as globalSentry).__SENTRY__;
   // Sentry does some patching to the __SENTRY__ global on import
   // we need that patching to be reapplied after deleting the global
   // or domain stuff doesn't work. To do this we first remove sentry
   // from the node module cache, then re-import.
-  delete require.cache[require.resolve('@sentry/node')];
-  require('@sentry/node'); // eslint-disable-line global-require
+  delete require.cache[require.resolve("@sentry/node")];
+  require("@sentry/node"); // eslint-disable-line global-require
   t.context.server = new hapi.Server();
 });
 
-test('requires a dsn or a Scope (sentry opts vs. sentry client)', async t => {
+test("requires a dsn or a Scope (sentry opts vs. sentry client)", async (t) => {
   const { server } = t.context;
-  const err = await t.throwsAsync(() => server.register({
-    plugin,
-    options: {
-      client: {},
-    },
-  }), {
-    name: 'ValidationError',
-    message: /Invalid hapi-sentry options/,
-  });
+  const err = await t.throwsAsync(
+    () =>
+      server.register<plugin.Options>({
+        plugin: plugin,
+        options: {
+          client: {},
+        } as plugin.Options,
+      }),
+    {
+      name: "ZodError",
+    }
+  );
 
-  t.deepEqual(err.details.map(d => d.message), [
-    '"client" does not match any of the allowed types',
-  ]);
+  t.deepEqual(
+    (err as ZodError).issues.map((i) => ({ message: i.message, path: i.path })),
+    [{ message: "Invalid input", path: ["client", "dsn"] }]
+  );
 });
 
-test('allows deactivating capture (opts.dsn to be false)', async t => {
+test("allows deactivating capture (opts.dsn to be false)", async (t) => {
   const { server } = t.context;
 
   server.route({
-    method: 'GET',
-    path: '/',
+    method: "GET",
+    path: "/",
     handler() {
-      throw new Error('Oh no!');
+      throw new Error("Oh no!");
     },
   });
 
   const deferred = defer();
-  await t.notThrowsAsync(() => server.register({
-    plugin,
-    options: {
-      client: {
-        dsn: false,
-        beforeSend: deferred.resolve,
+  await t.notThrowsAsync(() =>
+    server.register<plugin.Options>({
+      plugin,
+      options: {
+        client: {
+          dsn: false,
+          beforeSend: (): null => {
+            deferred.resolve();
+            return null;
+          },
+        },
       },
-    },
-  }));
+    })
+  );
 
   await server.inject({
-    method: 'GET',
-    url: '/',
+    method: "GET",
+    url: "/",
     payload: t.title,
   });
 
@@ -76,18 +92,18 @@ test('allows deactivating capture (opts.dsn to be false)', async t => {
   });
 
   // wait for sentry event possibly to be sent
-  await new Promise(resolve => setTimeout(resolve, 20));
+  await new Promise((resolve) => setTimeout(resolve, 20));
   t.is(eventCaptured, false);
 });
 
-test('uses a custom sentry client', async t => {
+test("uses a custom sentry client", async (t) => {
   const { server } = t.context;
 
-  const error = new Error('Error to be thrown');
+  const error = new Error("Error to be thrown");
 
   server.route({
-    method: 'GET',
-    path: '/route',
+    method: "GET",
+    path: "/route",
     handler() {
       throw error;
     },
@@ -95,7 +111,6 @@ test('uses a custom sentry client', async t => {
 
   const deferred = defer();
   const customSentry = {
-    Scope: class Scope { },
     getCurrentHub() {
       return {
         getScope() {
@@ -107,25 +122,26 @@ test('uses a custom sentry client', async t => {
       };
     },
     // arity needed to pass joi validation
-    Handlers: { parseRequest: (_x, _y) => { } }, // eslint-disable-line no-unused-vars
-    withScope: cb => cb({ addEventProcessor: () => { } }),
+    Handlers: { parseRequest: (_x: any, _y: any) => {} }, // eslint-disable-line @typescript-eslint/no-unused-vars,@typescript-eslint/no-empty-function
+    withScope: (cb: any) => cb({ addEventProcessor: () => {} }), // eslint-disable-line @typescript-eslint/no-empty-function
     captureException: deferred.resolve,
+    configureScope: (): void => {}, // eslint-disable-line @typescript-eslint/no-empty-function
   };
 
   // check exposing of custom client
-  await server.register({
+  await server.register<plugin.Options>({
     plugin,
     options: {
       client: customSentry,
     },
   });
 
-  t.deepEqual(server.plugins['hapi-sentry'].client, customSentry);
+  t.deepEqual(server.plugins["hapi-sentry"].client as any, customSentry);
 
   // check if custom sentry is used per request
   await server.inject({
-    method: 'GET',
-    url: '/route',
+    method: "GET",
+    url: "/route",
     payload: t.title,
   });
 
@@ -133,32 +149,35 @@ test('uses a custom sentry client', async t => {
   t.is(event, error);
 });
 
-test('exposes the sentry client', async t => {
+test("exposes the sentry client", async (t) => {
   const { server } = t.context;
 
-  await server.register({
+  await server.register<plugin.Options>({
     plugin,
     options: {
       client: { dsn },
     },
   });
 
-  t.is(typeof server.plugins['hapi-sentry'].client.captureException, 'function');
+  t.is(
+    typeof server.plugins["hapi-sentry"].client.captureException,
+    "function"
+  );
 });
 
-test('exposes a per-request scope', async t => {
+test("exposes a per-request scope", async (t) => {
   const { server } = t.context;
 
   server.route({
-    method: 'GET',
-    path: '/',
+    method: "GET",
+    path: "/",
     handler(request) {
-      t.is(typeof request.sentryScope.setTag, 'function');
+      t.is(typeof request.sentryScope.setTag, "function");
       return null;
     },
   });
 
-  await server.register({
+  await server.register<plugin.Options>({
     plugin,
     options: {
       client: { dsn },
@@ -166,269 +185,308 @@ test('exposes a per-request scope', async t => {
   });
 
   await server.inject({
-    method: 'GET',
-    url: '/',
+    method: "GET",
+    url: "/",
     payload: t.title,
   });
 });
 
-test('captures request errors', async t => {
+test("captures request errors", async (t) => {
   const { server } = t.context;
 
   server.route({
-    method: 'GET',
-    path: '/',
+    method: "GET",
+    path: "/",
     handler() {
-      throw new Error('Oh no!');
+      throw new Error("Oh no!");
     },
   });
 
-  const deferred = defer();
-  await server.register({
+  const deferred = defer<Sentry.Event>();
+  await server.register<plugin.Options>({
     plugin,
     options: {
       client: {
         dsn,
-        beforeSend: deferred.resolve,
+        beforeSend: (e): null => {
+          deferred.resolve(e);
+          return null;
+        },
       },
     },
   });
 
   await server.inject({
-    method: 'GET',
-    url: '/',
+    method: "GET",
+    url: "/",
     payload: t.title,
   });
 
   const event = await deferred.promise;
-  t.is(event.exception.values[0].value, 'Oh no!');
-  t.is(event.exception.values[0].type, 'Error');
+  t.assert(event.exception?.values && event.exception?.values?.length > 0);
+  if (event.exception?.values && event.exception?.values?.length > 0) {
+    t.is(event.exception?.values[0].value, "Oh no!");
+    t.is(event.exception?.values[0]?.type, "Error");
+  }
 });
 
-test('parses request metadata', async t => {
+test("parses request metadata", async (t) => {
   const { server } = t.context;
 
   server.route({
-    method: 'GET',
-    path: '/route',
+    method: "GET",
+    path: "/route",
     handler() {
-      throw new Error('Oh no!');
+      throw new Error("Oh no!");
     },
   });
 
-  const deferred = defer();
-  await server.register({
+  const deferred = defer<Sentry.Event>();
+  await server.register<plugin.Options>({
     plugin,
     options: {
       client: {
         dsn,
-        beforeSend: deferred.resolve,
+        beforeSend: (e): null => {
+          deferred.resolve(e);
+          return null;
+        },
       },
     },
   });
 
   await server.inject({
-    method: 'GET',
-    url: '/route',
+    method: "GET",
+    url: "/route",
     payload: t.title,
   });
 
   const { request } = await deferred.promise;
-  t.is(request.method, 'GET');
-  t.is(typeof request.headers, 'object');
-  t.is(request.url, `http://${request.headers.host}/route`);
+  t.assert(request);
+  if (request) {
+    t.is(request.method, "GET");
+    t.is(typeof request.headers, "object");
+    t.is(request.url, `http://${request?.headers?.host}/route`);
+  }
 });
 
-test('sanitizes user info from auth', async t => {
+test("sanitizes user info from auth", async (t) => {
   const { server } = t.context;
 
-  server.auth.scheme('mock', () => ({
+  server.auth.scheme("mock", () => ({
     authenticate(_request, h) {
       return h.authenticated({
         credentials: {
-          username: 'me',
-          password: 'open sesame',
-          pw: 'os',
-          secret: 'abc123',
+          username: "me",
+          password: "open sesame",
+          pw: "os",
+          secret: "abc123",
         },
       });
     },
   }));
-  server.auth.strategy('mock', 'mock');
+  server.auth.strategy("mock", "mock");
 
   server.route({
-    method: 'GET',
-    path: '/',
+    method: "GET",
+    path: "/",
     handler() {
-      throw new Error('Oh no!');
+      throw new Error("Oh no!");
     },
-    config: {
-      auth: 'mock',
+    options: {
+      auth: "mock",
     },
   });
 
-  const deferred = defer();
-  await server.register({
+  const deferred = defer<Sentry.Event>();
+  await server.register<plugin.Options>({
     plugin,
     options: {
       client: {
         dsn,
-        beforeSend: deferred.resolve,
+        beforeSend: (e): null => {
+          deferred.resolve(e);
+          return null;
+        },
       },
     },
   });
 
   await server.inject({
-    method: 'GET',
-    url: '/',
+    method: "GET",
+    url: "/",
     payload: t.title,
   });
 
   const event = await deferred.promise;
-  t.deepEqual(event.user, { username: 'me' });
+  t.deepEqual(event.user, { username: "me" });
 });
 
-test('process \'app\' channel events with default tags', async t => {
+test("process 'app' channel events with default tags", async (t) => {
   const { server } = t.context;
 
   server.route({
-    method: 'GET',
-    path: '/route',
+    method: "GET",
+    path: "/route",
     handler(request) {
-      request.log(['error', 'foo'], new Error('Oh no!'));
+      request.log(["error", "foo"], new Error("Oh no!"));
       return null;
     },
   });
 
-  const deferred = defer();
-  await server.register({
+  const deferred = defer<Sentry.Event>();
+  await server.register<plugin.Options>({
     plugin,
     options: {
       client: {
         dsn,
-        beforeSend: deferred.resolve,
+        beforeSend: (e): null => {
+          deferred.resolve(e);
+          return null;
+        },
       },
       catchLogErrors: true,
     },
   });
 
   await server.inject({
-    method: 'GET',
-    url: '/route',
+    method: "GET",
+    url: "/route",
     payload: t.title,
   });
 
   const event = await deferred.promise;
-  t.is(event.exception.values[0].value, 'Oh no!');
-  t.is(event.exception.values[0].type, 'Error');
+  t.assert(event.exception?.values && event.exception?.values?.length > 0);
+  if (event.exception?.values && event.exception?.values?.length > 0) {
+    t.is(event.exception.values[0].value, "Oh no!");
+    t.is(event.exception.values[0].type, "Error");
+  }
 });
 
-test('process \'app\' channel events with `catchLogErrors` tags', async t => {
+test("process 'app' channel events with `catchLogErrors` tags", async (t) => {
   const { server } = t.context;
 
   server.route({
-    method: 'GET',
-    path: '/route',
+    method: "GET",
+    path: "/route",
     handler(request) {
-      request.log('exception', new Error('Oh no!'));
+      request.log("exception", new Error("Oh no!"));
       return null;
     },
   });
 
-  const deferred = defer();
-  await server.register({
+  const deferred = defer<Sentry.Event>();
+  await server.register<plugin.Options>({
     plugin,
     options: {
       client: {
         dsn,
-        beforeSend: deferred.resolve,
+        beforeSend: (e): null => {
+          deferred.resolve(e);
+          return null;
+        },
       },
-      catchLogErrors: ['exception', 'failure'],
+      catchLogErrors: ["exception", "failure"],
     },
   });
 
   await server.inject({
-    method: 'GET',
-    url: '/route',
+    method: "GET",
+    url: "/route",
     payload: t.title,
   });
 
   const event = await deferred.promise;
-  t.is(event.exception.values[0].value, 'Oh no!');
-  t.is(event.exception.values[0].type, 'Error');
+  t.assert(event.exception?.values && event.exception?.values?.length > 0);
+  if (event.exception?.values && event.exception?.values?.length > 0) {
+    t.is(event.exception.values[0].value, "Oh no!");
+    t.is(event.exception.values[0].type, "Error");
+  }
 });
 
-test('process \'log\' events with default tags', async t => {
+test("process 'log' events with default tags", async (t) => {
   const { server } = t.context;
 
   server.route({
-    method: 'GET',
-    path: '/route',
+    method: "GET",
+    path: "/route",
     handler() {
-      server.log(['error', 'foo'], new Error('Oh no!'));
+      server.log(["error", "foo"], new Error("Oh no!"));
       return null;
     },
   });
 
-  const deferred = defer();
-  await server.register({
+  const deferred = defer<Sentry.Event>();
+  await server.register<plugin.Options>({
     plugin,
     options: {
       client: {
         dsn,
-        beforeSend: deferred.resolve,
+        beforeSend: (e): null => {
+          deferred.resolve(e);
+          return null;
+        },
       },
       catchLogErrors: true,
     },
   });
 
   await server.inject({
-    method: 'GET',
-    url: '/route',
+    method: "GET",
+    url: "/route",
     payload: t.title,
   });
 
   const event = await deferred.promise;
-  t.is(event.exception.values[0].value, 'Oh no!');
-  t.is(event.exception.values[0].type, 'Error');
+  t.assert(event.exception?.values && event.exception?.values?.length > 0);
+  if (event.exception?.values && event.exception?.values?.length > 0) {
+    t.is(event.exception.values[0].value, "Oh no!");
+    t.is(event.exception.values[0].type, "Error");
+  }
 });
 
-test('process \'log\' events with `catchLogErrors` tags', async t => {
+test("process 'log' events with `catchLogErrors` tags", async (t) => {
   const { server } = t.context;
 
   server.route({
-    method: 'GET',
-    path: '/route',
+    method: "GET",
+    path: "/route",
     handler() {
-      server.log('exception', new Error('Oh no!'));
+      server.log("exception", new Error("Oh no!"));
       return null;
     },
   });
 
-  const deferred = defer();
-  await server.register({
+  const deferred = defer<Sentry.Event>();
+  await server.register<plugin.Options>({
     plugin,
     options: {
       client: {
         dsn,
-        beforeSend: deferred.resolve,
+        beforeSend: (e): null => {
+          deferred.resolve(e);
+          return null;
+        },
       },
-      catchLogErrors: ['exception', 'failure'],
+      catchLogErrors: ["exception", "failure"],
     },
   });
 
   await server.inject({
-    method: 'GET',
-    url: '/route',
+    method: "GET",
+    url: "/route",
     payload: t.title,
   });
 
   const event = await deferred.promise;
-  t.is(event.exception.values[0].value, 'Oh no!');
-  t.is(event.exception.values[0].type, 'Error');
+  t.assert(event.exception?.values && event.exception?.values?.length > 0);
+  if (event.exception?.values && event.exception?.values?.length > 0) {
+    t.is(event.exception.values[0].value, "Oh no!");
+    t.is(event.exception.values[0].type, "Error");
+  }
 });
 
-test('request scope separation', async t => {
+test("request scope separation", async (t) => {
   const { server } = t.context;
 
   let remaining = 3;
@@ -444,36 +502,33 @@ test('request scope separation', async t => {
       }
 
       return Promise.resolve({
-        status: 'success',
+        status: "success",
       });
     }
   }
 
-  await server.register({
+  await server.register<plugin.Options>({
     plugin,
     options: {
       client: {
         dsn,
-        transport: DummyTransport,
+        transport: DummyTransport as unknown as TransportClass<Transport>,
         beforeSend: (event) => {
-          if (event.transaction === 'GET /one') {
-            t.deepEqual(event.tags,
-              {
-                globalTag: 'global',
-                oneTag: '👋',
-              });
-          } else if (event.transaction === 'GET /two') {
-            t.deepEqual(event.tags,
-              {
-                globalTag: 'global',
-                twoTag: '👋',
-              });
-          } else if (event.transaction === 'GET /three') {
-            t.deepEqual(event.tags,
-              {
-                globalTag: 'global',
-                threeTag: '👋',
-              });
+          if (event.transaction === "GET /one") {
+            t.deepEqual(event.tags, {
+              globalTag: "global",
+              oneTag: "👋",
+            });
+          } else if (event.transaction === "GET /two") {
+            t.deepEqual(event.tags, {
+              globalTag: "global",
+              twoTag: "👋",
+            });
+          } else if (event.transaction === "GET /three") {
+            t.deepEqual(event.tags, {
+              globalTag: "global",
+              threeTag: "👋",
+            });
           } else {
             t.fail(`Unknown transaction ${event.transaction}`);
           }
@@ -483,59 +538,59 @@ test('request scope separation', async t => {
     },
   });
 
-  Sentry.configureScope(scope => {
-    scope.setTag('globalTag', 'global');
+  Sentry.configureScope((scope) => {
+    scope.setTag("globalTag", "global");
   });
 
   server.route({
-    method: 'GET',
-    path: '/one',
+    method: "GET",
+    path: "/one",
     handler() {
-      Sentry.configureScope(scope => {
-        scope.setTag('oneTag', '👋');
+      Sentry.configureScope((scope) => {
+        scope.setTag("oneTag", "👋");
       });
 
-      throw new Error('one');
+      throw new Error("one");
     },
   });
 
   server.route({
-    method: 'GET',
-    path: '/two',
+    method: "GET",
+    path: "/two",
     handler() {
-      Sentry.configureScope(scope => {
-        scope.setTag('twoTag', '👋');
+      Sentry.configureScope((scope) => {
+        scope.setTag("twoTag", "👋");
       });
 
-      throw new Error('two');
+      throw new Error("two");
     },
   });
 
   server.route({
-    method: 'GET',
-    path: '/three',
+    method: "GET",
+    path: "/three",
     handler() {
-      Sentry.configureScope(scope => {
-        scope.setTag('threeTag', '👋');
+      Sentry.configureScope((scope) => {
+        scope.setTag("threeTag", "👋");
       });
 
-      throw new Error('three');
+      throw new Error("three");
     },
   });
 
   await Promise.all([
     server.inject({
-      method: 'GET',
-      url: '/one',
+      method: "GET",
+      url: "/one",
       payload: t.title,
     }),
     server.inject({
-      method: 'GET',
-      url: '/two',
+      method: "GET",
+      url: "/two",
     }),
     server.inject({
-      method: 'GET',
-      url: '/three',
+      method: "GET",
+      url: "/three",
     }),
   ]);
 
@@ -543,35 +598,41 @@ test('request scope separation', async t => {
   await deferred.promise;
 });
 
-test('listener interceptors', async t => {
+test("listener interceptors", async (t) => {
   const { server } = t.context;
 
   server.route({
-    method: 'GET',
-    path: '/',
+    method: "GET",
+    path: "/",
     handler() {
-      throw new Error('Oh no!');
+      throw new Error("Oh no!");
     },
   });
 
-  const deferred = defer();
-  await server.register({
+  const deferred = defer<Sentry.Event>();
+  await server.register<plugin.Options>({
     plugin,
     options: {
       client: {
         dsn,
-        beforeSend: deferred.resolve,
+        beforeSend: (e): null => {
+          deferred.resolve(e);
+          return null;
+        },
       },
     },
   });
 
-  await shot.inject((...args) => server.listener.emit('request', ...args), {
-    method: 'GET',
-    url: '/',
+  await shot.inject((...args) => server.listener.emit("request", ...args), {
+    method: "GET",
+    url: "/",
     payload: t.title,
   });
 
   const event = await deferred.promise;
-  t.is(event.exception.values[0].value, 'Oh no!');
-  t.is(event.exception.values[0].type, 'Error');
+  t.assert(event.exception?.values && event.exception?.values?.length > 0);
+  if (event.exception?.values && event.exception?.values?.length > 0) {
+    t.is(event.exception.values[0].value, "Oh no!");
+    t.is(event.exception.values[0].type, "Error");
+  }
 });
