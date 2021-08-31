@@ -6,7 +6,7 @@ const joi = require('joi');
 const shimmer = require('shimmer');
 const eventsIntercept = require('events-intercept');
 
-const { name, version } = require('./package.json');
+const { name, version } = require('../package.json');
 const schema = require('./schema');
 
 exports.register = (server, options) => {
