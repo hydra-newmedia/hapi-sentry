@@ -41,5 +41,6 @@ export const options = z
     client: sentryOptions.or(sentryClient),
     catchLogErrors: z.union([z.boolean(), z.string().array()]).default(false),
     useDomainPerRequest: z.boolean().default(false),
+    flushTimeout: z.number().optional(),
   })
   .passthrough();

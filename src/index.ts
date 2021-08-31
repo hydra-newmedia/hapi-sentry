@@ -4,11 +4,14 @@
 import domain = require("domain");
 import shimmer = require("shimmer");
 import eventsIntercept = require("events-intercept");
+import { logger } from "@sentry/utils";
+import { isAutoSessionTrackingEnabled, flush } from "@sentry/node/dist/sdk";
+import { RequestSessionStatus } from "@sentry/types";
 import type * as SentryNamespace from "@sentry/node";
 import type { NodeOptions } from "@sentry/node";
 import type { Server } from "@hapi/hapi";
 import { z } from "zod";
-import type * as Http from "http";
+import type * as http from "http";
 import { ExpressRequest } from "@sentry/node/dist/handlers";
 import { options as optionsSchema } from "./schema";
 import { name, version } from "../package.json";
@@ -34,8 +37,8 @@ declare module "http" {
     intercept: (
       event: string,
       interceptor: (
-        req: Http.ClientRequest,
-        res: Http.ServerResponse,
+        req: http.ClientRequest,
+        res: http.ServerResponse,
         done: InterceptorNext
       ) => void
     ) => void;
@@ -44,8 +47,8 @@ declare module "http" {
 
 type InterceptorNext = (
   e: Error | null,
-  req: Http.ClientRequest,
-  res: Http.ServerResponse,
+  req: http.ClientRequest,
+  res: http.ServerResponse,
   ...args: any[]
 ) => void;
 
@@ -85,6 +88,19 @@ async function register(server: Server, options: Options): Promise<void> {
   // expose sentry client at server.plugins['hapi-sentry'].client
   server.expose("client", Sentry);
 
+  const currentHub = Sentry.getCurrentHub();
+  const client = currentHub.getClient<SentryNamespace.NodeClient>();
+  // Setup the session flusher
+  if (client && isAutoSessionTrackingEnabled(client)) {
+    client.initSessionFlusher();
+
+    // If Scope contains a Single mode Session, it is removed in favor of using Session Aggregates mode
+    const scope = currentHub.getScope();
+    if (scope && scope.getSession()) {
+      scope.setSession();
+    }
+  }
+
   // Set up request interceptor for creating and destroying a domain on each request
   // It'll wrap the request handler returned by the _dispatch function in HAPI core
   // allowing it to create the domain before any of HAPIs processing starts
@@ -93,10 +109,21 @@ async function register(server: Server, options: Options): Promise<void> {
   function interceptor(
     this: any,
     next: InterceptorNext,
-    req: Http.ClientRequest,
-    res: Http.ServerResponse,
+    req: http.ClientRequest,
+    res: http.ServerResponse,
     ...args: any[]
   ) {
+    const _end = res.end;
+    res.end = function (chunk?: any, encoding?: any, cb?: () => void): void {
+      void flush(options.flushTimeout)
+        .then(() => {
+          _end.call(this, chunk, encoding, cb);
+        })
+        .then(null, (e) => {
+          logger.error(e);
+        });
+    };
+
     const local = domain.create(); // Create domain to hold context for request
     local.add(req);
     local.add(res);
@@ -108,6 +135,30 @@ async function register(server: Server, options: Options): Promise<void> {
       const currentHub = Sentry.getCurrentHub();
 
       currentHub.configureScope((scope) => {
+        const client = currentHub.getClient<SentryNamespace.NodeClient>();
+        if (isAutoSessionTrackingEnabled(client)) {
+          const scope = currentHub.getScope();
+          if (scope) {
+            // Set `status` of `RequestSession` to Ok, at the beginning of the request
+            scope.setRequestSession({ status: RequestSessionStatus.Ok });
+          }
+        }
+
+        res.once("finish", () => {
+          const client = currentHub.getClient<SentryNamespace.NodeClient>();
+          if (isAutoSessionTrackingEnabled(client)) {
+            setImmediate(() => {
+              // eslint-disable-next-line @typescript-eslint/no-unsafe-member-access
+              if (client && (client as any)._captureRequestSession) {
+                // Calling _captureRequestSession to capture request session at the end of the request by incrementing
+                // the correct SessionAggregates bucket i.e. crashed, errored or exited
+                // eslint-disable-next-line @typescript-eslint/no-unsafe-member-access
+                (client as any)._captureRequestSession();
+              }
+            });
+          }
+        });
+
         scope.addEventProcessor((_sentryEvent) => {
           // format a sentry event from the request and triggered event
           const sentryEvent = Sentry.Handlers.parseRequest(
@@ -141,8 +192,8 @@ async function register(server: Server, options: Options): Promise<void> {
     "request",
     function _requestInterceptor(
       this: any,
-      req: Http.ClientRequest,
-      res: Http.ServerResponse,
+      req: http.ClientRequest,
+      res: http.ServerResponse,
       ...args: any[]
     ) {
       interceptor.apply(this, [
@@ -157,8 +208,8 @@ async function register(server: Server, options: Options): Promise<void> {
     "checkContinue",
     function _checkContinueInterceptor(
       this: any,
-      req: Http.ClientRequest,
-      res: Http.ServerResponse,
+      req: http.ClientRequest,
+      res: http.ServerResponse,
       ...args: any[]
     ) {
       interceptor.apply(this, [
@@ -190,8 +241,8 @@ async function register(server: Server, options: Options): Promise<void> {
           function next(
             this: any,
             err: Error | null,
-            req: Http.ClientRequest,
-            res: Http.ServerResponse,
+            req: http.ClientRequest,
+            res: http.ServerResponse,
             ...args: any[]
           ) {
             listener.apply(this, [req, res, ...args]);
@@ -241,13 +292,35 @@ async function register(server: Server, options: Options): Promise<void> {
 
   // get request errors to capture them with sentry
   server.events.on({ name: "request", channels }, (request, event) => {
-    // check for errors in request logs
-    if (event.channel === "app") {
-      if (!event.error) return; // no error, just a log message
-      if (event.tags.some((tag) => errorTags.includes(tag)) === false) return; // no matching tag
-    }
+    Sentry.withScope((_scope) => {
+      // check for errors in request logs
+      if (event.channel === "app") {
+        if (!event.error) return; // no error, just a log message
+        if (event.tags.some((tag) => errorTags.includes(tag)) === false) return; // no matching tag
+      }
 
-    Sentry.captureException(event.error);
+      const client =
+        Sentry.getCurrentHub().getClient<SentryNamespace.NodeClient>();
+      if (client && isAutoSessionTrackingEnabled(client)) {
+        // Check if the `SessionFlusher` is instantiated on the client to go into this branch that marks the
+        // `requestSession.status` as `Crashed`, and this check is necessary because the `SessionFlusher` is only
+        // instantiated when the the`requestHandler` middleware is initialised, which indicates that we should be
+        // running in SessionAggregates mode
+        // eslint-disable-next-line @typescript-eslint/no-unsafe-member-access
+        const isSessionAggregatesMode =
+          (client as any)._sessionFlusher !== undefined;
+        if (isSessionAggregatesMode) {
+          const requestSession = _scope.getRequestSession();
+          // If an error bubbles to the `errorHandler`, then this is an unhandled error, and should be reported as a
+          // Crashed session. The `_requestSession.status` is checked to ensure that this error is happening within
+          // the bounds of a request, and if so the status is updated
+          if (requestSession && requestSession.status !== undefined)
+            requestSession.status = RequestSessionStatus.Crashed;
+        }
+      }
+
+      Sentry.captureException(event.error);
+    });
   });
 
   if (opts.catchLogErrors) {
