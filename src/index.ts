@@ -4,9 +4,11 @@
 import domain = require("domain");
 import shimmer = require("shimmer");
 import eventsIntercept = require("events-intercept");
-import { logger } from "@sentry/utils";
+import { logger, isString } from "@sentry/utils";
+import { extractTraceparentData, SpanStatus } from "@sentry/tracing";
 import { isAutoSessionTrackingEnabled, flush } from "@sentry/node/dist/sdk";
-import { RequestSessionStatus } from "@sentry/types";
+import { RequestSessionStatus, Transaction, Span } from "@sentry/types";
+import { extractRequestData } from "@sentry/node/dist/handlers";
 import type * as SentryNamespace from "@sentry/node";
 import type { NodeOptions } from "@sentry/node";
 import type { Server } from "@hapi/hapi";
@@ -14,11 +16,13 @@ import { z } from "zod";
 import type * as http from "http";
 import { ExpressRequest } from "@sentry/node/dist/handlers";
 import { options as optionsSchema } from "./schema";
+import { extractransactionName } from "./utils";
 import { name, version } from "../package.json";
 
 declare module "@hapi/hapi" {
   interface Request {
-    [key: string]: any;
+    sentryScope?: SentryNamespace.Scope;
+    sentrySpan?: Span;
   }
 
   interface Server {
@@ -37,7 +41,7 @@ declare module "http" {
     intercept: (
       event: string,
       interceptor: (
-        req: http.ClientRequest,
+        req: http.IncomingMessage,
         res: http.ServerResponse,
         done: InterceptorNext
       ) => void
@@ -47,7 +51,7 @@ declare module "http" {
 
 type InterceptorNext = (
   e: Error | null,
-  req: http.ClientRequest,
+  req: http.IncomingMessage,
   res: http.ServerResponse,
   ...args: any[]
 ) => void;
@@ -109,7 +113,7 @@ async function register(server: Server, options: Options): Promise<void> {
   function interceptor(
     this: any,
     next: InterceptorNext,
-    req: http.ClientRequest,
+    req: http.IncomingMessage,
     res: http.ServerResponse,
     ...args: any[]
   ) {
@@ -135,6 +139,9 @@ async function register(server: Server, options: Options): Promise<void> {
       const currentHub = Sentry.getCurrentHub();
 
       currentHub.configureScope((scope) => {
+        /*                                    */
+        /* Setup session tracking per request */
+        /*                                    */
         const client = currentHub.getClient<SentryNamespace.NodeClient>();
         if (isAutoSessionTrackingEnabled(client)) {
           const scope = currentHub.getScope();
@@ -159,6 +166,46 @@ async function register(server: Server, options: Options): Promise<void> {
           }
         });
 
+        /*                                     */
+        /* Setup trace transaction per request */
+        /*                                     */
+        if (opts.tracing) {
+          // If there is a trace header set, we extract the data from it (parentSpanId, traceId, and sampling decision)
+          let traceparentData;
+          if (req.headers && isString(req.headers["sentry-trace"])) {
+            traceparentData = extractTraceparentData(
+              req.headers["sentry-trace"] as string
+            );
+          }
+
+          const transaction = Sentry.startTransaction(
+            {
+              name: extractransactionName(req, { path: true, method: true }),
+              op: "http.server",
+              ...traceparentData,
+            },
+            // extra context passed to the tracesSampler
+            { request: extractRequestData(req) }
+          );
+
+          // We put the transaction on the scope so users can attach children to it
+          Sentry.getCurrentHub().configureScope((scope) => {
+            scope.setSpan(transaction);
+          });
+
+          res.once("finish", () => {
+            // Push `transaction.finish` to the next event loop so open spans have a chance to finish before the transaction
+            // closes
+            setImmediate(() => {
+              transaction.setHttpStatus(res.statusCode);
+              transaction.finish();
+            });
+          });
+        }
+
+        /*                               */
+        /* Setup request event processor */
+        /*                               */
         scope.addEventProcessor((_sentryEvent) => {
           // format a sentry event from the request and triggered event
           const sentryEvent = Sentry.Handlers.parseRequest(
@@ -170,7 +217,7 @@ async function register(server: Server, options: Options): Promise<void> {
           if (opts.baseUri && sentryEvent.request) {
             if (opts.baseUri.slice(-1) === "/")
               opts.baseUri = opts.baseUri.slice(0, -1);
-            sentryEvent.request.url = opts.baseUri + req.path;
+            sentryEvent.request.url = opts.baseUri + req.url;
           }
 
           // some SDK identifier
@@ -192,7 +239,7 @@ async function register(server: Server, options: Options): Promise<void> {
     "request",
     function _requestInterceptor(
       this: any,
-      req: http.ClientRequest,
+      req: http.IncomingMessage,
       res: http.ServerResponse,
       ...args: any[]
     ) {
@@ -208,7 +255,7 @@ async function register(server: Server, options: Options): Promise<void> {
     "checkContinue",
     function _checkContinueInterceptor(
       this: any,
-      req: http.ClientRequest,
+      req: http.IncomingMessage,
       res: http.ServerResponse,
       ...args: any[]
     ) {
@@ -241,7 +288,7 @@ async function register(server: Server, options: Options): Promise<void> {
           function next(
             this: any,
             err: Error | null,
-            req: http.ClientRequest,
+            req: http.IncomingMessage,
             res: http.ServerResponse,
             ...args: any[]
           ) {
@@ -259,6 +306,64 @@ async function register(server: Server, options: Options): Promise<void> {
       method: (request, h) => {
         // To maintain backwards compatibility attached the Hub scope to the request
         request.sentryScope = Sentry.getCurrentHub().getScope();
+
+        // Create a span so we can trace Hapi's request lifecycle before the request
+        // handler is fired.
+        const transaction = request.sentryScope?.getTransaction();
+        if (transaction) {
+          (request as any).__preHandlerSpan = transaction.startChild({
+            op: "preHandler",
+            description:
+              "Hapi lifecycle process before request handler is called",
+          });
+        }
+        return h.continue;
+      },
+    },
+    {
+      type: "onPreHandler",
+      method: (request, h) => {
+        const preHandlerSpan: Span = (request as any).__preHandlerSpan;
+        if (preHandlerSpan) {
+          preHandlerSpan.setStatus(SpanStatus.Ok);
+          preHandlerSpan.finish();
+
+          // Also create a new span for the request handler
+          request.sentrySpan = Sentry.getCurrentHub()
+            .getScope()
+            ?.getTransaction()
+            ?.startChild({
+              op: "requestHandler",
+              description: "Request handler",
+            });
+        }
+
+        return h.continue;
+      },
+    },
+    {
+      type: "onPostHandler",
+      method: (request, h) => {
+        // Close off the request span
+        const requestSpan = request.sentrySpan;
+        if (requestSpan) {
+          requestSpan.finish();
+          if (requestSpan.status === undefined) {
+            requestSpan.setStatus(SpanStatus.Ok);
+          }
+        }
+
+        // Create a span so we can trace Hapi's request lifecycle after the request
+        // handler is fired.
+        const transaction = request.sentryScope?.getTransaction();
+        if (transaction) {
+          (request as any).__postHandlerSpan = transaction.startChild({
+            op: "postHandler",
+            description:
+              "Hapi lifecycle process after request handler is called",
+          });
+        }
+
         return h.continue;
       },
     },
@@ -319,8 +424,50 @@ async function register(server: Server, options: Options): Promise<void> {
         }
       }
 
+      // Mark any unfinished spans as failed
+      if (opts.tracing) {
+        const preSpan: Span = (request as any).__preHandlerSpan;
+        const handlerSpan: Span = (request as any).sentrySpan;
+        const postSpan: Span = (request as any).__postHandlerSpan;
+
+        const spans = [preSpan, handlerSpan, postSpan];
+
+        spans.map((span) => {
+          if (span) {
+            if (span.status === undefined) {
+              span.setStatus(SpanStatus.InternalError);
+            }
+            if (span.endTimestamp === undefined) {
+              span.finish();
+            }
+          }
+        });
+      }
+
       Sentry.captureException(event.error);
     });
+  });
+
+  server.events.on("response", (request) => {
+    if (opts.tracing) {
+      const postSpan: Span = (request as any).__postHandlerSpan;
+      if (postSpan) {
+        postSpan.setStatus(SpanStatus.Ok);
+        postSpan.finish();
+      }
+
+      const transaction: Transaction | undefined = Sentry.getCurrentHub()
+        .getScope()
+        ?.getTransaction();
+      if (transaction) {
+        if ("statusCode" in request.response) {
+          transaction.setHttpStatus(request.response.statusCode);
+        } else {
+          transaction.setStatus(SpanStatus.Cancelled);
+        }
+        transaction.finish();
+      }
+    }
   });
 
   if (opts.catchLogErrors) {

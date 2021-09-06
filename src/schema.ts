@@ -42,5 +42,6 @@ export const options = z
     catchLogErrors: z.union([z.boolean(), z.string().array()]).default(false),
     useDomainPerRequest: z.boolean().default(false),
     flushTimeout: z.number().optional(),
+    tracing: z.boolean().default(false),
   })
   .passthrough();

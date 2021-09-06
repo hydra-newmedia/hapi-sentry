@@ -11,6 +11,9 @@
     "lint-fix": "eslint --fix --ignore-path .gitignore src/**",
     "format": "prettier --write ./src/"
   },
+  "files": [
+    "lib/**"
+  ],
   "lint-staged": {
     "src/**/*.{ts,js}": [
       "eslint --fix",
@@ -60,7 +63,9 @@
     "@sentry/node": "^6.0.0"
   },
   "dependencies": {
+    "@sentry/tracing": "^6.12.0",
     "@sentry/utils": "^6.12.0",
+    "cookie": "^0.4.1",
     "events-intercept": "^2.0.0",
     "shimmer": "^1.2.1",
     "zod": "^3.8.1"
@@ -79,6 +84,7 @@
     "@hapi/shot": "^5.0.5",
     "@sentry/node": "^6.11.0",
     "@sentry/types": "^6.12.0",
+    "@types/cookie": "^0.4.1",
     "@types/hapi__hapi": "^20.0.9",
     "@types/hapi__joi": "^17.1.7",
     "@types/node": "^16.7.4",
