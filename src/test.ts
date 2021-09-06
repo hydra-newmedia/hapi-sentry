@@ -7,7 +7,7 @@ import hapi = require("@hapi/hapi");
 import shot = require("@hapi/shot");
 import defer = require("p-defer");
 import Sentry = require("@sentry/node");
-import type { TransportClass, Transport } from "@sentry/types";
+import { Response, Status } from "@sentry/types";
 
 import * as plugin from ".";
 import { ZodError } from "zod";
@@ -114,9 +114,12 @@ test("uses a custom sentry client", async (t) => {
     getCurrentHub() {
       return {
         getScope() {
-          return {};
+          return null;
         },
         configureScope() {
+          return null;
+        },
+        getClient() {
           return null;
         },
       };
@@ -172,7 +175,7 @@ test("exposes a per-request scope", async (t) => {
     method: "GET",
     path: "/",
     handler(request) {
-      t.is(typeof request.sentryScope.setTag, "function");
+      t.is(typeof request.sentryScope?.setTag, "function");
       return null;
     },
   });
@@ -494,49 +497,59 @@ test("request scope separation", async (t) => {
 
   class DummyTransport {
     // eslint-disable-next-line class-methods-use-this
-    sendEvent() {
+    async sendEvent(): Promise<Response> {
       remaining -= 1;
 
       if (remaining === 0) {
         deferred.resolve();
       }
 
-      return Promise.resolve({
+      Promise.resolve({
         status: "success",
       });
+
+      return {
+        status: Status.Skipped,
+      };
+    }
+    async close() {
+      return true;
     }
   }
 
-  await server.register<plugin.Options>({
-    plugin,
-    options: {
-      client: {
-        dsn,
-        transport: DummyTransport as unknown as TransportClass<Transport>,
-        beforeSend: (event) => {
-          if (event.transaction === "GET /one") {
-            t.deepEqual(event.tags, {
-              globalTag: "global",
-              oneTag: "👋",
-            });
-          } else if (event.transaction === "GET /two") {
-            t.deepEqual(event.tags, {
-              globalTag: "global",
-              twoTag: "👋",
-            });
-          } else if (event.transaction === "GET /three") {
-            t.deepEqual(event.tags, {
-              globalTag: "global",
-              threeTag: "👋",
-            });
-          } else {
-            t.fail(`Unknown transaction ${event.transaction}`);
-          }
-          return event;
+  await t.notThrowsAsync(
+    server.register<plugin.Options>({
+      plugin,
+      options: {
+        client: {
+          dsn,
+          debug: true,
+          transport: DummyTransport,
+          beforeSend: (event) => {
+            if (event.transaction === "GET /one") {
+              t.deepEqual(event.tags, {
+                globalTag: "global",
+                oneTag: "👋",
+              });
+            } else if (event.transaction === "GET /two") {
+              t.deepEqual(event.tags, {
+                globalTag: "global",
+                twoTag: "👋",
+              });
+            } else if (event.transaction === "GET /three") {
+              t.deepEqual(event.tags, {
+                globalTag: "global",
+                threeTag: "👋",
+              });
+            } else {
+              t.fail(`Unknown transaction ${event.transaction}`);
+            }
+            return event;
+          },
         },
       },
-    },
-  });
+    })
+  );
 
   Sentry.configureScope((scope) => {
     scope.setTag("globalTag", "global");
@@ -578,21 +591,25 @@ test("request scope separation", async (t) => {
     },
   });
 
-  await Promise.all([
-    server.inject({
-      method: "GET",
-      url: "/one",
-      payload: t.title,
-    }),
-    server.inject({
-      method: "GET",
-      url: "/two",
-    }),
-    server.inject({
-      method: "GET",
-      url: "/three",
-    }),
-  ]);
+  await t.notThrowsAsync(
+    Promise.all([
+      server.inject({
+        method: "GET",
+        url: "/one",
+        payload: t.title,
+      }),
+      server.inject({
+        method: "GET",
+        url: "/two",
+        payload: t.title,
+      }),
+      server.inject({
+        method: "GET",
+        url: "/three",
+        payload: t.title,
+      }),
+    ])
+  );
 
   // Will cause test to time out if not fired
   await deferred.promise;
