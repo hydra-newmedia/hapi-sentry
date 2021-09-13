@@ -314,11 +314,18 @@ async function register(server: Server, options: Options): Promise<void> {
         // handler is fired.
         const transaction = request.sentryScope?.getTransaction();
         if (transaction) {
-          (request as any).__preHandlerSpan = transaction.startChild({
+          // Push a new scope and create new span so any preHandler stuff gets it's own scope to work in
+          const scope = Sentry.getCurrentHub().getScope();
+          // (scope as any).__isPreHandlerScope = true;
+
+          const span = transaction.startChild({
             op: "preHandler",
             description:
               "Hapi lifecycle process before request handler is called",
           });
+
+          scope?.setSpan(span);
+          (request as any).__preHandlerSpan = span;
         }
         return h.continue;
       },
@@ -331,14 +338,27 @@ async function register(server: Server, options: Options): Promise<void> {
           preHandlerSpan.setStatus(SpanStatus.Ok);
           preHandlerSpan.finish();
 
+          // Check that the current Scope is the preHandlerScope, and pop it if it is
+          // if it isn't, then do nothing because we don't know how tangled everything is
+          // if ((Sentry.getCurrentHub().getScope() as any).__isPreHandlerScope) {
+          //   Sentry.getCurrentHub().popScope();
+          // }
+
+          // Create new scope
+          // const scope = Sentry.getCurrentHub().pushScope();
+          // (scope as any).__isHandlerScope = true;
+
           // Also create a new span for the request handler
-          request.sentrySpan = Sentry.getCurrentHub()
+          const span = Sentry.getCurrentHub()
             .getScope()
             ?.getTransaction()
             ?.startChild({
               op: "requestHandler",
               description: "Request handler",
             });
+          request.sentrySpan = span;
+
+          Sentry.getCurrentHub().getScope()?.setSpan(span);
         }
 
         return h.continue;
@@ -356,15 +376,27 @@ async function register(server: Server, options: Options): Promise<void> {
           }
         }
 
+        // // Pop the handler scope
+        // if ((Sentry.getCurrentHub().getScope() as any).__isHandlerScope) {
+        //   Sentry.getCurrentHub().popScope();
+        // }
+
+        // // Push new scope for postHandler actions
+        // const scope = Sentry.getCurrentHub().pushScope();
+        // (scope as any).__isPostHandlerScope = true;
+
         // Create a span so we can trace Hapi's request lifecycle after the request
         // handler is fired.
         const transaction = request.sentryScope?.getTransaction();
         if (transaction) {
-          (request as any).__postHandlerSpan = transaction.startChild({
+          const span = transaction.startChild({
             op: "postHandler",
             description:
               "Hapi lifecycle process after request handler is called",
           });
+          (request as any).__postHandlerSpan = span;
+
+          Sentry.getCurrentHub().getScope()?.setSpan(span);
         }
 
         return h.continue;
@@ -495,6 +527,8 @@ async function register(server: Server, options: Options): Promise<void> {
         postSpan.finish();
       }
 
+      // Set the transaction status based on the response code. This is
+      // the outer most span that contains the preHandler, Handler and postHandler spans
       const transaction: Transaction | undefined = Sentry.getCurrentHub()
         .getScope()
         ?.getTransaction();
