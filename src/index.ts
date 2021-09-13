@@ -16,7 +16,10 @@ import { z } from "zod";
 import type * as http from "http";
 import { ExpressRequest } from "@sentry/node/dist/handlers";
 import { options as optionsSchema } from "./schema";
-import { extractransactionName } from "./utils";
+import {
+  extractPossibleSentryUserProperties,
+  extractransactionName,
+} from "./utils";
 import { name, version } from "../package.json";
 
 declare module "@hapi/hapi" {
@@ -373,18 +376,47 @@ async function register(server: Server, options: Options): Promise<void> {
         Sentry.configureScope((scope) => {
           // use request credentials for current scope
           if (opts.trackUser && request.auth && request.auth.credentials) {
-            let creds = { ...request.auth.credentials };
-            // If credentials has a `user` key, promote that to the top
-            // because it should contain the user details
-            if ("user" in creds) {
-              creds = { ...creds.user, ...creds };
-            }
+            const creds = { ...request.auth.credentials };
+
+            // Extract useful sentry user identifiers from credentials
+            const { extracted: credsExtracted, meta: credsExtractedMeta } =
+              extractPossibleSentryUserProperties(creds, true);
+
+            // If `user` is an object then also extract stuff from there
+            const { extracted: userExtracted, meta: userExtractedMeta } =
+              "user" in creds &&
+              creds.user != null &&
+              typeof creds.user === "object"
+                ? extractPossibleSentryUserProperties(
+                    creds.user as Record<string, unknown>,
+                    false,
+                    "user"
+                  )
+                : { extracted: null, meta: null };
 
             Object.keys(creds) // hide credentials
               .filter((prop) => /^(p(ass)?w(or)?(d|t)?|secret)?$/i.test(prop))
               .forEach((prop) => delete creds[prop]);
 
-            scope.setUser(creds);
+            // Put the results together, starting with what we extracted from
+            // a user object, followed by what we extracted off the root of the
+            // creds object, finally the original creds object
+            const sentryUser = {
+              ...userExtracted,
+              ...credsExtracted,
+              ...creds,
+            };
+
+            // Assemble and add the meta afterwards. So it can be skipped if empty
+            const sentryMeta = {
+              ...userExtractedMeta,
+              ...credsExtractedMeta,
+            };
+            if (Object.keys(sentryMeta).length > 0) {
+              sentryUser.__meta_extracted_sentry_properties_src = sentryMeta;
+            }
+
+            scope.setUser(sentryUser);
           }
         });
 

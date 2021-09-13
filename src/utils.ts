@@ -3,6 +3,7 @@ import { ExtractedNodeRequestData } from "@sentry/types";
 import { isString, normalize, stripUrlQueryAndFragment } from "@sentry/utils";
 import * as cookie from "cookie";
 import * as url from "url";
+import { string } from "@hapi/joi";
 
 // Based on @sentry/node express handler
 export function extractransactionName(
@@ -126,4 +127,60 @@ export function extractRequestData(
   });
 
   return requestData;
+}
+
+// https://docs.sentry.io/platforms/javascript/enriching-events/identify-user/
+const alternativesToSentry: Record<string, string> = {
+  id: "id",
+  userid: "id",
+  user: "username",
+  username: "username",
+  email: "email",
+  ipaddress: "ip_address",
+  ip_address: "ip_address",
+};
+
+export function extractPossibleSentryUserProperties(
+  v: Record<string, unknown>,
+  ignoreSameName = false,
+  path = "",
+  del = false
+): {
+  extracted: Record<string, unknown>;
+  meta: Record<string, string>;
+} {
+  // Normalise input keys
+  const normalisedToOrig: Record<string, string> = {};
+  Object.keys(v).map(
+    (prop) =>
+      (normalisedToOrig[prop.toLocaleLowerCase().replace(/[-_ ]/, "")] = prop)
+  );
+
+  // Create result object is empty meta property
+  const extracted: Record<string, unknown> = {};
+  const meta: Record<string, string> = {};
+
+  // Map over all the normalised alternative names
+  // if they exist in the normalised property names
+  // of the input, then extract them.
+  Object.keys(alternativesToSentry).map((alt) => {
+    const origName = normalisedToOrig[alt];
+    const sentryName = alternativesToSentry[alt];
+
+    if (ignoreSameName && origName == sentryName) return;
+
+    // Ignore anything that isn't a string
+    if (typeof v[origName] !== "string") return;
+
+    extracted[sentryName] = v[origName];
+
+    // Store the path of original property value in a meta result
+    meta[sentryName] = [path, origName].join(".");
+
+    // If we've been told to delete the original properties then
+    // do so here
+    if (del) delete v[origName];
+  });
+
+  return { extracted, meta };
 }

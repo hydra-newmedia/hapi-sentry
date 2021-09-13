@@ -284,6 +284,10 @@ test("sanitizes user info from auth", async (t) => {
           password: "open sesame",
           pw: "os",
           secret: "abc123",
+          user: {
+            userID: "testUserID",
+            email: "test@mail.com",
+          },
         },
       });
     },
@@ -322,7 +326,19 @@ test("sanitizes user info from auth", async (t) => {
   });
 
   const event = await deferred.promise;
-  t.deepEqual(event.user, { username: "me" });
+  t.deepEqual(event.user, {
+    username: "me",
+    id: "testUserID",
+    email: "test@mail.com",
+    user: {
+      userID: "testUserID",
+      email: "test@mail.com",
+    },
+    __meta_extracted_sentry_properties_src: {
+      email: "user.email",
+      id: "user.userID",
+    },
+  });
 });
 
 test("process 'app' channel events with default tags", async (t) => {
