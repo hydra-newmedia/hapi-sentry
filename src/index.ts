@@ -373,10 +373,17 @@ async function register(server: Server, options: Options): Promise<void> {
         Sentry.configureScope((scope) => {
           // use request credentials for current scope
           if (opts.trackUser && request.auth && request.auth.credentials) {
-            const creds = { ...request.auth.credentials };
+            let creds = { ...request.auth.credentials };
+            // If credentials has a `user` key, promote that to the top
+            // because it should contain the user details
+            if ("user" in creds) {
+              creds = { ...creds.user, ...creds };
+            }
+
             Object.keys(creds) // hide credentials
               .filter((prop) => /^(p(ass)?w(or)?(d|t)?|secret)?$/i.test(prop))
               .forEach((prop) => delete creds[prop]);
+
             scope.setUser(creds);
           }
         });
