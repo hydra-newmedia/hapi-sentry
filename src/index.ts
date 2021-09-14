@@ -319,9 +319,7 @@ async function register(server: Server, options: Options): Promise<void> {
           // (scope as any).__isPreHandlerScope = true;
 
           const span = transaction.startChild({
-            op: "preHandler",
-            description:
-              "Hapi lifecycle process before request handler is called",
+            op: "hapi.pre-handler",
           });
 
           scope?.setSpan(span);
@@ -353,8 +351,8 @@ async function register(server: Server, options: Options): Promise<void> {
             .getScope()
             ?.getTransaction()
             ?.startChild({
-              op: "requestHandler",
-              description: "Request handler",
+              op: "http.handler",
+              description: `${request.route.path}`,
             });
           request.sentrySpan = span;
 
@@ -390,9 +388,7 @@ async function register(server: Server, options: Options): Promise<void> {
         const transaction = request.sentryScope?.getTransaction();
         if (transaction) {
           const span = transaction.startChild({
-            op: "postHandler",
-            description:
-              "Hapi lifecycle process after request handler is called",
+            op: "hapi.post-handler",
           });
           (request as any).__postHandlerSpan = span;
 
