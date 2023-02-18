@@ -63,7 +63,9 @@ test('allows deactivating capture (opts.dsn to be false)', async t => {
   });
 
   // wait for sentry event possibly to be sent
-  await new Promise(resolve => setTimeout(resolve, 20));
+  await new Promise(resolve => {
+    setTimeout(resolve, 20);
+  });
   t.is(eventCaptured, false);
 });
 
