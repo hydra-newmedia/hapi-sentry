@@ -1,9 +1,8 @@
 # hapi-sentry
 
 [![package on npm](https://img.shields.io/npm/v/hapi-sentry.svg)](https://www.npmjs.com/package/hapi-sentry)
-[![David](https://img.shields.io/david/hydra-newmedia/hapi-sentry)](https://david-dm.org/hydra-newmedia/hapi-sentry)
-[![GitHub Workflow Status](https://img.shields.io/github/workflow/status/hydra-newmedia/hapi-sentry/Node.js%20CI/master)](https://github.com/hydra-newmedia/hapi-sentry/actions/workflows/nodejs.yml)
-![node 12+ required](https://img.shields.io/badge/node-12%2B-brightgreen.svg)
+[![GitHub Workflow Status](https://github.com/hydra-newmedia/hapi-sentry/actions/workflows/nodejs.yml/badge.svg)](https://github.com/hydra-newmedia/hapi-sentry/actions/workflows/nodejs.yml)
+![node 14+ required](https://img.shields.io/badge/node-14%2B-brightgreen.svg)
 [![GitHub license](https://img.shields.io/badge/license-MIT-blue.svg)](https://raw.githubusercontent.com/hydra-newmedia/hapi-sentry/master/LICENSE)
 
 A hapi [plugin](https://hapijs.com/api#plugins) for
