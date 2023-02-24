@@ -1,10 +1,8 @@
 'use strict';
 
-const { Severity } = require('@sentry/node');
 const joi = require('joi');
 
-const levels = Object.values(Severity).filter(level => typeof level === 'string')
-  || ['fatal', 'error', 'warning', 'log', 'info', 'debug', 'critical'];
+const levels = ['fatal', 'error', 'warning', 'log', 'info', 'debug'];
 
 const sentryClient = joi.object().keys({
   configureScope: joi.function().minArity(1),
