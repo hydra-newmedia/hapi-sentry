@@ -57,6 +57,6 @@
     "eslint-plugin-import": "^2.27.5",
     "husky": "^8.0.3",
     "lint-staged": "^13.1.2",
-    "p-defer": "^3.0.0"
+    "p-defer": "^4.0.0"
   }
 }
