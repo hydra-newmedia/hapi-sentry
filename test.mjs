@@ -1,10 +1,11 @@
-'use strict';
+/* eslint-disable import/no-extraneous-dependencies */
+// eslint-disable-next-line import/no-unresolved
+import test from 'ava';
+import hapi from '@hapi/hapi';
+import defer from 'p-defer';
 
-const test = require('ava');
-const hapi = require('@hapi/hapi');
-const defer = require('p-defer');
-
-const plugin = require('.');
+// eslint-disable-next-line import/extensions
+import plugin from './index.js';
 
 const dsn = 'https://examplePublicKey@o0.ingest.sentry.io/0';
 
