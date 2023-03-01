@@ -4,32 +4,27 @@
   "description": "hapi plugin for @sentry/node",
   "main": "index.js",
   "scripts": {
-    "test": "ava -v test.js --serial",
+    "test": "ava -v test.mjs --serial",
     "lint": "eslint --ignore-path .gitignore .",
     "lint-fix": "eslint --fix --ignore-path .gitignore ."
   },
-  "lint-staged": {
-    "*.js": "eslint"
-  },
-  "husky": {
-    "hooks": {
-      "pre-commit": "lint-staged"
-    }
-  },
   "eslintConfig": {
     "extends": [
-      "airbnb-base",
-      "plugin:ava/recommended"
+      "airbnb-base"
     ],
     "parserOptions": {
-      "sourceType": "script"
+      "ecmaVersion": "latest",
+      "sourceType": "module"
     },
     "rules": {
       "arrow-parens": 0,
       "strict": 0,
       "no-underscore-dangle": 0,
       "no-param-reassign": 0
-    }
+    },
+    "plugins": [
+      "ava"
+    ]
   },
   "repository": "github:hydra-newmedia/hapi-sentry",
   "keywords": [
@@ -50,13 +45,11 @@
   },
   "devDependencies": {
     "@hapi/hapi": "^21.3.0",
-    "ava": "3.15.0",
+    "ava": "^5.2.0",
     "eslint": "^8.34.0",
     "eslint-config-airbnb-base": "^15.0.0",
     "eslint-plugin-ava": "^14.0.0",
     "eslint-plugin-import": "^2.27.5",
-    "husky": "^8.0.3",
-    "lint-staged": "^13.1.2",
-    "p-defer": "^3.0.0"
+    "p-defer": "^4.0.0"
   }
 }
