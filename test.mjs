@@ -2,12 +2,18 @@
 // eslint-disable-next-line import/no-unresolved
 import test from 'ava';
 import hapi from '@hapi/hapi';
+import * as Sentry from '@sentry/node';
 import defer from 'p-defer';
 
 // eslint-disable-next-line import/extensions
 import plugin from './index.js';
 
 const dsn = 'https://examplePublicKey@o0.ingest.sentry.io/0';
+
+const sentryTestClient = (beforeSend) => {
+  Sentry.init({ dsn, beforeSend });
+  return Sentry;
+};
 
 test.beforeEach(t => {
   delete global.__SENTRY__;
@@ -18,16 +24,14 @@ test('requires a dsn or a Scope (sentry opts vs. sentry client)', async t => {
   const { server } = t.context;
   const err = await t.throwsAsync(() => server.register({
     plugin,
-    options: {
-      client: {},
-    },
+    options: { client: null },
   }), {
     name: 'ValidationError',
     message: /Invalid hapi-sentry options/,
   });
 
   t.deepEqual(err.details.map(d => d.message), [
-    '"client" does not match any of the allowed types',
+    '"client" must be of type object',
   ]);
 });
 
@@ -43,13 +47,12 @@ test('allows deactivating capture (opts.dsn to be false)', async t => {
   });
 
   const deferred = defer();
+  Sentry.init({ dsn: null, beforeSend: deferred.resolve });
+
   await t.notThrowsAsync(() => server.register({
     plugin,
     options: {
-      client: {
-        dsn: false,
-        beforeSend: deferred.resolve,
-      },
+      client: Sentry,
     },
   }));
 
@@ -125,7 +128,7 @@ test('exposes the sentry client', async t => {
   await server.register({
     plugin,
     options: {
-      client: { dsn },
+      client: sentryTestClient(),
     },
   });
 
@@ -147,7 +150,7 @@ test('exposes a per-request scope', async t => {
   await server.register({
     plugin,
     options: {
-      client: { dsn },
+      client: sentryTestClient(),
     },
   });
 
@@ -172,10 +175,7 @@ test('captures request errors', async t => {
   await server.register({
     plugin,
     options: {
-      client: {
-        dsn,
-        beforeSend: deferred.resolve,
-      },
+      client: sentryTestClient(deferred.resolve),
     },
   });
 
@@ -204,10 +204,7 @@ test('parses request metadata', async t => {
   await server.register({
     plugin,
     options: {
-      client: {
-        dsn,
-        beforeSend: deferred.resolve,
-      },
+      client: sentryTestClient(deferred.resolve),
     },
   });
 
@@ -226,7 +223,7 @@ test('sanitizes user info from auth', async t => {
   const { server } = t.context;
 
   server.auth.scheme('mock', () => ({
-    authenticate(request, h) {
+    authenticate(_, h) {
       return h.authenticated({
         credentials: {
           username: 'me',
@@ -254,10 +251,7 @@ test('sanitizes user info from auth', async t => {
   await server.register({
     plugin,
     options: {
-      client: {
-        dsn,
-        beforeSend: deferred.resolve,
-      },
+      client: sentryTestClient(deferred.resolve),
     },
   });
 
@@ -286,10 +280,7 @@ test('process \'app\' channel events with default tags', async t => {
   await server.register({
     plugin,
     options: {
-      client: {
-        dsn,
-        beforeSend: deferred.resolve,
-      },
+      client: sentryTestClient(deferred.resolve),
       catchLogErrors: true,
     },
   });
@@ -320,10 +311,7 @@ test('process \'app\' channel events with `catchLogErrors` tags', async t => {
   await server.register({
     plugin,
     options: {
-      client: {
-        dsn,
-        beforeSend: deferred.resolve,
-      },
+      client: sentryTestClient(deferred.resolve),
       catchLogErrors: ['exception', 'failure'],
     },
   });
@@ -354,10 +342,7 @@ test('process \'log\' events with default tags', async t => {
   await server.register({
     plugin,
     options: {
-      client: {
-        dsn,
-        beforeSend: deferred.resolve,
-      },
+      client: sentryTestClient(deferred.resolve),
       catchLogErrors: true,
     },
   });
@@ -388,10 +373,7 @@ test('process \'log\' events with `catchLogErrors` tags', async t => {
   await server.register({
     plugin,
     options: {
-      client: {
-        dsn,
-        beforeSend: deferred.resolve,
-      },
+      client: sentryTestClient(deferred.resolve),
       catchLogErrors: ['exception', 'failure'],
     },
   });

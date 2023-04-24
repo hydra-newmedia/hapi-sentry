@@ -10,14 +10,7 @@ const schema = require('./schema');
 exports.register = (server, options) => {
   const opts = joi.attempt(options, schema, 'Invalid hapi-sentry options:');
 
-  let Sentry = opts.client;
-  // initialize own sentry client if none passed as option
-  if (opts.client.dsn !== undefined) {
-    // eslint-disable-next-line global-require
-    Sentry = require('@sentry/node');
-    Sentry.init(opts.client);
-  }
-
+  const Sentry = opts.client;
   // initialize global scope if set via plugin options
   if (opts.scope) {
     Sentry.configureScope(scope => {

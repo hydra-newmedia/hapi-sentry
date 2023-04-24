@@ -14,10 +14,6 @@ const sentryClient = joi.object().keys({
   captureException: joi.function().minArity(1).required(),
 }).unknown();
 
-const sentryOptions = joi.object().keys({
-  dsn: joi.string().uri().allow(false).required(),
-}).unknown();
-
 module.exports = joi.object().keys({
   baseUri: joi.string().uri(),
   trackUser: joi.boolean().default(true),
@@ -29,7 +25,7 @@ module.exports = joi.object().keys({
     level: joi.string().valid(...levels),
     extra: joi.object(),
   }),
-  client: joi.alternatives().try(sentryOptions, sentryClient).required(),
+  client: sentryClient,
   catchLogErrors: joi.alternatives().try(
     joi.boolean(),
     joi.array().items(joi.string()),

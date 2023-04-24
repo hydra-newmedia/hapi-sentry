@@ -12,17 +12,20 @@ request error logging to [Sentry](https://sentry.io/).
 
 Use the hapi plugin like this:
 ```JavaScript
+const hapi = require('@hapi/hapi');
+const Sentry = require('@sentry/node');
 const server = hapi.server();
+
+Sentry.init({ dsn: 'dsn-here' });
 await server.register({
   plugin: require('hapi-sentry'),
   options: {
-    client: { dsn: 'dsn-here' },
+    client: Sentry,
   },
 });
 ```
 
 This setup will:
-* Initialize Sentry regularly, which should capture all global errors and unhandled promise rejects
 * Capture all unhandled exceptions thrown or returned in routes
 * Use request data and `request.auth.credentials` to enhance errors from routes
 
@@ -39,18 +42,7 @@ The plugin options, you can pass in while registering are the following:
 | `scope.tags.name`         | string        | The name of a tag                                                                                                            |
 | `scope.tags.value`        | any           | The value of a tag                                                                                                           |
 | `scope.extra`             | object        | An object of arbitrary format to be sent as extra data on every event                                                        |
-| `client`                  | object        | **required** A [@sentry/node](https://www.npmjs.com/package/@sentry/node) instance which was already initialized (using `Sentry.init`) OR an options object to be passed to an internally initialized [@sentry/node](https://www.npmjs.com/package/@sentry/node) (`client.dsn` is only required in the latter case) |
-| `client.dsn`              | string/false  | **required** The Dsn used to connect to Sentry and identify the project. If false, the SDK will not send any data to Sentry. |
-| `client.debug`            | boolean       | Turn debug mode on/off                                                                                                       |
-| `client.release`          | string        | Tag events with the version/release identifier of your application                                                           |
-| `client.environment`      | string        | The current environment of your application (e.g. `'production'`)                                                            |
-| `client.sampleRate`       | number        | A global sample rate to apply to all events (0 - 1)                                                                          |
-| `client.maxBreadcrumbs`   | number        | The maximum number of breadcrumbs sent with events. Default: `100`                                                           |
-| `client.attachStacktrace` | any           | Attaches stacktraces to pure capture message / log integrations                                                              |
-| `client.sendDefaultPii`   | boolean       | If this flag is enabled, certain personally identifiable information is added by active integrations                         |
-| `client.serverName`       | string        | Overwrite the server name (device name)                                                                                      |
-| `client.beforeSend`       | func          | A callback invoked during event submission, allowing to optionally modify the event before it is sent to Sentry              |
-| `client.beforeBreadcrumb` | func          | A callback invoked when adding a breadcrumb, allowing to optionally modify it before adding it to future events.             |
+| `client`                  | object        | **required** A [@sentry/node](https://www.npmjs.com/package/@sentry/node) instance which was already initialized (using `Sentry.init`) |
 | `trackUser`               | boolean       | Whether or not to track the user via the per-request scope. Default: `true`                                                  |
 | `catchLogErrors`          | boolean/array | Handles [capturing server.log and request.log events](#capturing-serverlog-and-requestlog-events). Default: `false`          |
 | `useDomainPerRequest`     | boolean       | Whether or not to use [Domains](https://nodejs.org/docs/latest-v12.x/api/domain.html) for seperating request processing. Only activate this feature, if you really need to seperate breadcrumbs, etc. of requests. It utilizes a deprecated Node.js feature which reduces [performance](https://github.com/hydra-newmedia/hapi-sentry/pull/21#issuecomment-574602486). Default: `false` |
@@ -58,23 +50,7 @@ The plugin options, you can pass in while registering are the following:
 The `baseUri` option is used internally to get a correct URL in sentry issues.
 The `scope` option is used to set up a global
 [`Scope`](http://getsentry.github.io/sentry-javascript/classes/hub.scope.html)
-for all events and the
-[`client`](http://getsentry.github.io/sentry-javascript/interfaces/node.nodeoptions.html) option
-is used as a Sentry instance or to initialize an internally used Sentry instance.
-
-The internally used client (initialized in either way) is accessible through
-`server.plugins['hapi-sentry'].client`.
-
-## Using your own Sentry instance
-
-You can pass a `Sentry` instance to  the `client` option if you already initialized your own like this:
-
-```js
-const server = hapi.server();
-const Sentry = require('sentry');
-Sentry.init({ dsn: 'dsn-here' });
-await server.register({ plugin: require('hapi-sentry'), options: { client: Sentry } });
-```
+for all events.
 
 ## Scope
 
