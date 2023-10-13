@@ -31,7 +31,7 @@ test('requires a dsn or a Scope (sentry opts vs. sentry client)', async t => {
   ]);
 });
 
-test('allows deactivating capture (opts.dsn to be false)', async t => {
+test('allows initialization without dsn (opts.dsn to be false)', async t => {
   const { server } = t.context;
 
   server.route({
@@ -67,7 +67,9 @@ test('allows deactivating capture (opts.dsn to be false)', async t => {
   await new Promise(resolve => {
     setTimeout(resolve, 20);
   });
-  t.is(eventCaptured, false);
+
+  // still captured https://github.com/hydra-newmedia/hapi-sentry/issues/144
+  t.is(eventCaptured, true);
 });
 
 test('uses a custom sentry client', async t => {
