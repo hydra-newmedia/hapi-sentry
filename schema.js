@@ -26,8 +26,8 @@ module.exports = z.object({
       name: z.string(),
       value: z.any(),
     })),
-    level: z.enum(levels),
-    extra: z.object(),
+    level: z.enum(levels).optional(),
+    extra: z.object().optional(),
   }).optional(),
   client: z.union([
     sentryOptionsSchema,
