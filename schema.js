@@ -26,7 +26,7 @@ module.exports = z.object({
       name: z.string(),
       value: z.any(),
     })),
-    level: z.literal(...levels),
+    level: z.enum(levels),
     extra: z.object(),
   }).optional(),
   client: z.union([
