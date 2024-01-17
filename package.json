@@ -26,7 +26,10 @@
       "ava"
     ]
   },
-  "repository": "github:hydra-newmedia/hapi-sentry",
+  "repository": {
+    "type": "git",
+    "url": "git+https://github.com/hydra-newmedia/hapi-sentry.git"
+  },
   "keywords": [
     "hapi",
     "sentry",
