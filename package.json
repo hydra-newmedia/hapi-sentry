@@ -1,6 +1,6 @@
 {
   "name": "hapi-sentry",
-  "version": "4.0.0",
+  "version": "4.0.1-0",
   "description": "hapi plugin for @sentry/node",
   "main": "index.js",
   "scripts": {
