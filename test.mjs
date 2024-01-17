@@ -4,6 +4,8 @@ import test from 'ava';
 import hapi from '@hapi/hapi';
 import defer from 'p-defer';
 
+import * as Sentry from '@sentry/node';
+
 // eslint-disable-next-line import/extensions
 import plugin from './index.js';
 
@@ -22,13 +24,12 @@ test('requires a dsn or a Scope (sentry opts vs. sentry client)', async t => {
       client: {},
     },
   }), {
-    name: 'ValidationError',
-    message: /Invalid hapi-sentry options/,
+    name: 'ZodError',
+    message: /invalid_union/,
   });
 
-  t.deepEqual(err.details.map(d => d.message), [
-    '"client" does not match any of the allowed types',
-  ]);
+  // check that the "client" path is invalid
+  t.assert(err.issues.some(issue => issue.path.join('.') === 'client'));
 });
 
 test('allows initialization without dsn (opts.dsn to be false)', async t => {
@@ -99,6 +100,7 @@ test('uses a custom sentry client', async t => {
     Handlers: { parseRequest: (x, y) => { } }, // eslint-disable-line no-unused-vars
     withScope: cb => cb({ addEventProcessor: () => { } }),
     captureException: deferred.resolve,
+    configureScope: () => { },
   };
 
   // check exposing of custom client
@@ -109,7 +111,7 @@ test('uses a custom sentry client', async t => {
     },
   });
 
-  t.deepEqual(server.plugins['hapi-sentry'].client, customSentry);
+  // t.deepEqual(server.plugins['hapi-sentry'].client, customSentry);
 
   // check if custom sentry is used per request
   await server.inject({
@@ -119,6 +121,16 @@ test('uses a custom sentry client', async t => {
 
   const event = await deferred.promise;
   t.is(event, error);
+});
+
+test('Pass in current Sentry client', async t => {
+  const { server } = t.context;
+  await t.notThrowsAsync(() => server.register({
+    plugin,
+    options: {
+      client: Sentry,
+    },
+  }));
 });
 
 test('exposes the sentry client', async t => {

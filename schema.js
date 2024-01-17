@@ -1,38 +1,41 @@
 'use strict';
 
-const joi = require('joi');
+const z = require('zod');
 
 const levels = ['fatal', 'error', 'warning', 'log', 'info', 'debug'];
 
-const sentryClient = joi.object().keys({
-  configureScope: joi.function().minArity(1),
-  Scope: joi.function().required(),
-  Handlers: joi.object().keys({
-    parseRequest: joi.function().minArity(2).required(),
-  }).unknown().required(),
-  withScope: joi.function().minArity(1).required(),
-  captureException: joi.function().minArity(1).required(),
-}).unknown();
-
-const sentryOptions = joi.object().keys({
-  dsn: joi.string().uri().allow(false).required(),
-}).unknown();
-
-module.exports = joi.object().keys({
-  baseUri: joi.string().uri(),
-  trackUser: joi.boolean().default(true),
-  scope: joi.object().keys({
-    tags: joi.array().items(joi.object().keys({
-      name: joi.string().required(),
-      value: joi.any().required(),
-    })),
-    level: joi.string().valid(...levels),
-    extra: joi.object(),
+const sentryClientSchema = z.object({
+  configureScope: z.function().args(z.function()),
+  Scope: z.any(),
+  Handlers: z.object({
+    parseRequest: z.function().args(z.function(), z.function()),
   }),
-  client: joi.alternatives().try(sentryOptions, sentryClient).required(),
-  catchLogErrors: joi.alternatives().try(
-    joi.boolean(),
-    joi.array().items(joi.string()),
-  ).default(false),
-  useDomainPerRequest: joi.boolean().default(false),
+  withScope: z.function().args(z.function()),
+  captureException: z.function(),
+}).passthrough();
+
+const sentryOptionsSchema = z.object({
+  dsn: z.string().url().or(z.boolean()).nullable(),
+}).passthrough();
+
+module.exports = z.object({
+  baseUri: z.string().url().optional(),
+  trackUser: z.boolean().default(true),
+  scope: z.object({
+    tags: z.array(z.object({
+      name: z.string(),
+      value: z.any(),
+    })),
+    level: z.literal(...levels),
+    extra: z.object(),
+  }).optional(),
+  client: z.union([
+    sentryOptionsSchema,
+    sentryClientSchema,
+  ]),
+  catchLogErrors: z.union([
+    z.boolean(),
+    z.array(z.string()),
+  ]).default(false),
+  useDomainPerRequest: z.boolean().default(false),
 });

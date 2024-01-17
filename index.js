@@ -1,14 +1,15 @@
 'use strict';
 
 const Hoek = require('@hapi/hoek');
-const joi = require('joi');
 const domain = require('domain');
 
 const { name, version } = require('./package.json');
 const schema = require('./schema');
 
 exports.register = (server, options) => {
-  const opts = joi.attempt(options, schema, 'Invalid hapi-sentry options:');
+  // const opts = joi.attempt(options, schema, 'Invalid hapi-sentry options:');
+  // validate options with zod
+  const opts = schema.parse(options);
 
   let Sentry = opts.client;
   // initialize own sentry client if none passed as option
