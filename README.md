@@ -1,5 +1,7 @@
 # hapi-sentry
 
+**⚠️ This package is deprecated. Use the [native sentry hapi integration](https://docs.sentry.io/platforms/javascript/guides/hapi/).**
+
 [![package on npm](https://img.shields.io/npm/v/hapi-sentry.svg)](https://www.npmjs.com/package/hapi-sentry)
 [![GitHub Workflow Status](https://github.com/hydra-newmedia/hapi-sentry/actions/workflows/nodejs.yml/badge.svg)](https://github.com/hydra-newmedia/hapi-sentry/actions/workflows/nodejs.yml)
 ![node 14+ required](https://img.shields.io/badge/node-14%2B-brightgreen.svg)
